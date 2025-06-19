@@ -53,3 +53,4 @@ def test_derived_parameters_positive():
     assert driver.Mms > 0, f"Mms debe ser positivo: {driver.Mms}"
     assert driver.Cms > 0, f"Cms debe ser positivo: {driver.Cms}"
     assert driver.Rms > 0, f"Rms debe ser positivo: {driver.Rms}"
+ 

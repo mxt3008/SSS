@@ -1,28 +1,32 @@
+# --------------------------------------------
+# --------------------------------------------
 # main.py
+# --------------------------------------------
+# --------------------------------------------
 
 # --------------------------------------------
 # Importar librerías necesarias
 # --------------------------------------------
 
-import numpy as np                  # Para operaciones matemáticas y arrays
+import numpy as np                                                          # Para operaciones matemáticas y arrays
 import matplotlib
-matplotlib.use("TkAgg")   # <-- fuerza el backend que abre ventana
-import matplotlib.pyplot as plt     # Para graficar
-from core.driver import Driver      # Importa tu clase Driver personalizada
+matplotlib.use("TkAgg")                                                     # Fuerza el backend que abre ventana
+import matplotlib.pyplot as plt                                             # Para graficar
+from core.driver import Driver                                              # Importa tu clase Driver personalizada
 
 # --------------------------------------------
 # Definir parámetros del altavoz
 # --------------------------------------------
 
 params = {
-    "Fs": 40,          # Frecuencia de resonancia [Hz]
-    "Vas": 50,         # Volumen de aire equivalente [litros]
-    "Qts": 0.35,       # Factor de calidad total
-    "Qes": 0.4,        # Factor de calidad eléctrico
-    "Re": 6.0,         # Resistencia de la bobina [Ohm]
-    "Bl": 7.5,         # Producto flujo-Bobina [N/A]
-    "Sd": 0.02,        # Área efectiva del diafragma [m²]
-    "Le": 0.0005       # Inductancia de la bobina [Henrios]
+    "Fs": 40,                                                               # Frecuencia de resonancia [Hz]
+    "Vas": 50,                                                              # Volumen de aire equivalente [litros]
+    "Qts": 0.35,                                                            # Factor de calidad total
+    "Qes": 0.4,                                                             # Factor de calidad eléctrico
+    "Re": 6.0,                                                              # Resistencia de la bobina [Ohm]
+    "Bl": 7.5,                                                              # Producto flujo-Bobina [N/A]
+    "Sd": 0.02,                                                             # Área efectiva del diafragma [m²]
+    "Le": 0.0005                                                            # Inductancia de la bobina [Henrios]
 }
 
 # Crear una instancia de Driver con estos parámetros
@@ -32,19 +36,20 @@ my_driver = Driver(params)
 # Mostrar parámetros derivados en consola
 # --------------------------------------------
 
-print(f"Mms: {my_driver.Mms:.4f} kg")   # Masa móvil del diafragma
-print(f"Cms: {my_driver.Cms:.6f} m/N")  # Complianza mecánica
-print(f"Rms: {my_driver.Rms:.4f} kg/s") # Resistencia mecánica
-print(f"Qms: {my_driver.Qms():.4f}")    # Factor de calidad mecánico
+print(f"Mms: {my_driver.Mms:.4f} kg")                                       # Masa móvil del diafragma
+print(f"Cms: {my_driver.Cms:.6f} m/N")                                      # Complianza mecánica
+print(f"Rms: {my_driver.Rms:.4f} kg/s")                                     # Resistencia mecánica
+print(f"Qms: {my_driver.Qms():.4f}")                                        # Factor de calidad mecánico
+print(f"Kms: {my_driver.derive_Kms():.4f} N/m")     
 
 # --------------------------------------------
 # Calcular y mostrar impedancia y SPL para una frecuencia específica
 # --------------------------------------------
 
-freq = 40  # Hz
-Z = my_driver.impedance(freq)  # Impedancia compleja a esa frecuencia
-print(f"Impedancia a {freq} Hz: {abs(Z):.2f} Ohm (módulo)")  # Módulo
-print(f"SPL a {freq} Hz: {my_driver.spl_response(freq):.2f} dB")  # SPL estimado
+freq = 40                                                                   # Hz
+Z = my_driver.impedance(freq)                                               # Impedancia compleja a esa frecuencia
+print(f"Impedancia a {freq} Hz: {abs(Z):.2f} Ohm (módulo)")                 # Módulo
+print(f"SPL a {freq} Hz: {my_driver.spl_response(freq):.2f} dB")            # SPL estimado
 
 # --------------------------------------------
 # Barrido de frecuencias para simulación de rango completo
