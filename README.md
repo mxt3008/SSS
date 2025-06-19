@@ -1,4 +1,4 @@
-# Speaker Simulator
+# Speaker Simulation Software - SSS
 
 Proyecto de simulación físico-numérica de altavoces para la maestría en Física Aplicada (Acústica).
 
