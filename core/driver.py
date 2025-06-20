@@ -7,6 +7,10 @@ import numpy as np  # Importa numpy para cálculos matemáticos complejos
 class Driver:
     def __init__(self, params):
 
+        # -------------------------------
+        # Parámetros principales
+        # -------------------------------
+
         # Parámetros mecánicos
         self.Fs = params.get("Fs", 40)                  # Frecuencia de resonancia, en Hz
 
@@ -25,91 +29,134 @@ class Driver:
         #Parámetros de volumen y desplazamiento
         self.Vas = params.get("Vas", 50)                # Volumen de aire equivalente, en litros
         self.Sd = params.get("Sd", 0.02)                # Área efectiva del diafragma, en m²
+        if self.Sd <= 0:                                # Área del diafragma debe ser mayor que cero
+            raise ValueError("El área Sd debe ser mayor que cero para convertir Cms a Vas.")       
         self.Xmax = params.get("Xmax", 0.005)           # Excursión máxima lineal, en m
 
-        # Cálculo de parámetros derivados:
-        self.Kms = params.get("Kms", None)
-        self.Cms = params.get("Cms", None)
-        
-        self.Mms = self.derive_Mms() if params.get("Mms") is None else params["Mms"]            # Mms y Cms se resuelven inteligentemente:
+        # -------------------------------
+        # Cálculo de parámetros derivados
+        # ------------------------------
+        self.resolve_Mms_Cms_Fs()
 
-        if self.Kms:
-            self.Cms = 1 / self.Kms
-        elif self.Cms is None:
-            self.Cms = self.derive_Cms()
-
+        # Derivar Kms y Rms
+        self.Kms = 1 / self.Cms
         self.Rms = self.derive_Rms()
 
-        print(f"Mms: {self.Mms:.4f} kg, Cms: {self.Cms:.6e} m/N, Rms: {self.Rms:.3f} kg/s")
+        # Derivar Vas realista usando Cms y condiciones reales
+        self.Vas = self.derive_Vas()
 
-        # Propiedades del aire:
-        self.rho0 = 1.21                                # Densidad del aire, kg/m³
-        self.c = 343                                    # Velocidad del sonido, m/s
+        # -------------------------------
+        # Condiciones ambientales y físicas
+        # -------------------------------
+        self.T0 = params.get("T0", 293.15)              # Temperatura ambiente en Kelvin (20°C por defecto)
+        if self.T0 < 0:
+            raise ValueError("La temperatura T0 debe ser mayor o igual a 0 K.")
+        
+        self.P0 = 101325                                # Presión atmosférica estándar al nivel del mar [Pa] (101.325 kPa)
+        self.P0 = params.get("P0", self.P0)             # Presión atmosférica en Pa (101325 Pa por defecto)
+        if self.P0 <= 0:
+            raise ValueError("La presión P0 debe ser mayor que 0 Pa.")
+
+        self.gamma = 1.4                                # Coeficiente de dilatación adiabática para aire seco (aproximadamente 1.4)
+
+        self.R = 287.05                                 # Constante de gas ideal para aire seco [J/(kg·K)] (287.05 J/(kg·K))
+        if self.R <= 0:
+            raise ValueError("La constante de gas R debe ser mayor que 0 J/(kg·K).")
+
+        # Densidad y velocidad del sonido ajustadas a T0
+        self.rho0 = self.P0 / (self.R * self.T0)
+        self.c = np.sqrt(self.gamma * self.R * self.T0)
 
 # -----------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------
 
-    def derive_Mms(self):
-        " Calcula la masa móvil (Mms) usando: Mms = Bl² / [Re * (2πFs)² * Qes]"
-        w0 = 2 * np.pi * self.Fs                # Velocidad angular de resonancia
-        return (self.Bl**2) / (self.Re * w0**2 * self.Qes)
+        # -------------------------------
+        # Resumen en consola
+        # -------------------------------
+        print(f"""
+        Driver parameters:
+          Fs  = {self.Fs:.2f} Hz
+          Mms = {self.Mms:.5f} kg
+          Cms = {self.Cms:.6e} m/N
+          Vas = {self.Vas:.2f} L
+          Rms = {self.Rms:.5f} kg/s
+          rho0 = {self.rho0:.3f} kg/m³
+          c = {self.c:.2f} m/s
+        """)
 
-    def derive_Cms(self):
-        " Calcula la complianza mecánica (Cms) a partir de Mms y Fs: Cms = 1 / (Mms * w0²)"
-        w0 = 2 * np.pi * self.Fs
-        return 1 / (self.Mms * w0**2)
+# -----------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------
+
+    def resolve_Mms_Cms_Fs(self):
+        if self.Fs and self.Mms and self.Cms:
+            # Verificar coherencia: Fs calculado debe coincidir.
+            w0 = np.sqrt(1 / (self.Cms * self.Mms))
+            Fs_check = w0 / (2 * np.pi)
+            if abs(Fs_check - self.Fs) > 0.5:
+                print(f"⚠️ Advertencia: Fs, Mms y Cms no son coherentes entre sí. Fs calculado = {Fs_check:.2f} Hz")
+        elif self.Fs and self.Mms and not self.Cms:
+            w0 = 2 * np.pi * self.Fs
+            self.Cms = 1 / (self.Mms * w0**2)
+        elif self.Fs and self.Cms and not self.Mms:
+            w0 = 2 * np.pi * self.Fs
+            self.Mms = 1 / (w0**2 * self.Cms)
+        elif self.Mms and self.Cms and not self.Fs:
+            w0 = np.sqrt(1 / (self.Cms * self.Mms))
+            self.Fs = w0 / (2 * np.pi)
+        else:
+            raise ValueError("Debes definir al menos dos de: Fs, Mms, Cms.")
+
+
+    def derive_Vas(self):
+        # Usa Vas de catálogo si fue dado explícitamente
+        if "Vas" in self.__dict__ and self.Vas != 50:  # 50 es el default, ajusta si quieres
+            return self.Vas
+        else:
+            Caa = self.Cms * self.Sd**2
+            Vas_m3 = Caa * self.rho0 * self.c**2 / self.P0
+            return Vas_m3 * 1e3  # m³ a litros
+
 
     def derive_Rms(self):
-        " Calcula la resistencia mecánica de pérdidas (Rms): Rms = Mms * w0 / Qms"
         w0 = 2 * np.pi * self.Fs
         return self.Mms * w0 / self.Qms()
-    
-    def derive_Kms(self):
-        w0 = 2 * np.pi * self.Fs
-        return self.Mms * w0 ** 2
-    
+
     def Qms(self):
-        " Calcula el factor de calidad mecánico (Qms) usando Qts y Qes: Qms = (Qts * Qes) / (Qes - Qts)"
         if self.Qms_user:
             return self.Qms_user
         else:
             return (self.Qts * self.Qes) / (self.Qes - self.Qts)
 
+    def derive_Kms(self):
+        return 1 / self.Cms
+
     def impedance(self, f):
-        """ Calcula la impedancia eléctrica total a una frecuencia f (Hz). Incluye:
-        - Parte eléctrica: Re, Le
-        - Acoplamiento electro-mecánico: Bl² / Zm
-        - Zm: Impedancia mecánica resonante"""
-        w = 2 * np.pi * f                                   # Velocidad angular
-        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)   # Impedancia mecánica
-        Ze = self.Re + 1j*w*self.Le + (self.Bl**2) / Zm     # Impedancia total
+        #Impedancia total
+        w = 2 * np.pi * f
+        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
+        Ze = self.Re + 1j*w*self.Le + (self.Bl**2) / Zm
         return Ze
 
-    # def spl_response(self, f, Pe=1):
-    #     """ Estima el SPL en campo libre para una frecuencia f. Se basa en la eficiencia y la potencia eléctrica aplicada Pe.
-    #     Aproxima usando la fórmula básica de SPL: SPL ≈ 112 + 10 log10(η0) + 10 log10(Pe)"""
-    #     SPL0 = 112 + 10 * np.log10(self.efficiency())
-    #     return SPL0 + 10 * np.log10(Pe)
+    def velocity(self, f):
+        #Velocidad del cono para corriente de 1A
+        w = 2 * np.pi * f
+        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
+        return self.Bl / Zm
+
+    def spl_response(self, f, Pe=1):
+        #SPL campo libre, r=1m
+        w = 2 * np.pi * f
+        Z = self.impedance(f)
+        I = np.sqrt(Pe / Z.real)
+        v = self.velocity(f) * I
+        p = 1j * w * self.rho0 * v * self.Sd / (4 * np.pi * 1)
+        p_ref = 20e-6
+        return 20 * np.log10(np.abs(p) / p_ref)
 
     def efficiency(self):
-        """ Calcula la eficiencia de banda ancha (η0) de acuerdo con: η0 = Bl² / [Re * ρ0 * c * Sd * w0²]
-        Este es un modelo clásico de eficiencia para altavoces dinámicos."""
+        #Eficiencia de banda ancha
         w0 = 2 * np.pi * self.Fs
         eta0 = (self.Bl ** 2) / (self.Re * self.rho0 * self.c ** 3 * self.Sd)
         return eta0
-    
-    def velocity(self, f):
-        # Velocidad del cono para corriente de 1 A (corriente normalizada).
-        w = 2 * np.pi * f
-        Zm = self.Rms + 1j * w * self.Mms + 1/(1j * w * self.Cms)
-        return self.Bl / Zm                                 # v(f) para i(f)=1A
-
-    def spl_response(self, f, Pe=1):
-        # SPL realista usando la presión radiada. Asume impedancia de entrada → corriente, luego presión.
-        w = 2 * np.pi * f
-        Z = self.impedance(f)
-        I = np.sqrt(Pe / Z.real)                            # Corriente real (1 W)
-        v = self.velocity(f) * I
-        p = 1j * w * self.rho0 * v * self.Sd / (4 * np.pi * 1)  # r=1m
-        p_ref = 20e-6
-        return 20 * np.log10(np.abs(p) / p_ref)
-    
