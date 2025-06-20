@@ -3,34 +3,45 @@
 # Script principal para simular y analizar el comportamiento de un parlante en aire libre.
 # --------------------------------------------
 
+#====================================================================================================================================
+#====================================================================================================================================
+#====================================================================================================================================
+
 # --------------------------------------------
 # Importar librerías necesarias
 # --------------------------------------------
 
-import numpy as np                              # Para operaciones matemáticas y manejo de arrays
-import matplotlib
-matplotlib.use("TkAgg")                         # Fuerza el uso del backend TkAgg para mostrar gráficos en ventana
-import matplotlib.pyplot as plt                 # Para graficar resultados
-from core.driver import Driver                  # Importa la clase Driver definida en core/driver.py
+import numpy as np                                                          # Para operaciones matemáticas y manejo de arrays
+import matplotlib                                                           # Para graficar resultados
+matplotlib.use("TkAgg")                                                     # Fuerza el uso del backend TkAgg para mostrar gráficos en ventana
+import matplotlib.pyplot as plt                                             # Para crear gráficos y visualizaciones
+import matplotlib.ticker as ticker                                          # Para formatear ejes en gráficos
+from matplotlib.ticker import LogLocator, FixedLocator, ScalarFormatter     # Para formatear ejes logarítmicos y escalares
+import mplcursors                                                           # Para agregar cursores interactivos a los gráficos
+
+from core.driver import Driver                                              # Importa la clase Driver definida en core/driver.py
+
+#====================================================================================================================================
+#====================================================================================================================================
+#====================================================================================================================================
 
 # --------------------------------------------
 # Definir parámetros del altavoz
 # --------------------------------------------
 
 params = {
-    "Fs": 40,           
-    "Mms": 0.025,        # masa móvil aproximada [kg]
-    "Vas": 50,           
-    "Qts": 0.35,         
-    "Qes": 0.4,          
-    "Re": 6.0,           
-    "Bl": 7.5,           
-    "Sd": 0.02,          
-    "Le": 0.0005         
+    "Fs": 40,                                   # Frecuencia de resonancia [Hz]
+    "Mms": 0.025,                               # Masa móvil aproximada [kg]
+    "Vas": 50,                                  # Volumen de aire equivalente [litros]
+    "Qts": 0.35,                                # Factor de calidad total
+    "Qes": 0.4,                                 # Factor de calidad eléctrico
+    "Re": 6.0,                                  # Resistencia DC de la bobina [Ohm]
+    "Bl": 7.5,                                  # Producto flujo-Bobina [N/A]
+    "Sd": 0.02,                                 # Área efectiva del diafragma [m²]
+    "Le": 0.0005                                # Inductancia de la bobina [Henrios]
 }
 
-# Crear una instancia de Driver con estos parámetros
-my_driver = Driver(params)
+my_driver = Driver(params)                      # Crea una instancia del driver con los parámetros definidos
 
 # # --------------------------------------------
 # # Mostrar parámetros derivados en consola
@@ -56,7 +67,7 @@ print(f"SPL a {freq} Hz: {my_driver.spl_response(freq):.2f} dB")    # Imprime el
 # Barrido de frecuencias para simulación de rango completo
 # --------------------------------------------
 
-frequencies = np.logspace(np.log10(5), np.log10(20000), 1000)         # Vector de frecuencias de 5 Hz a 1000 Hz (escala logarítmica)
+frequencies = np.logspace(np.log10(5), np.log10(20000), 2000)       # Vector de frecuencias de 5 Hz a 1000 Hz (escala logarítmica)
 
 # Calcula la impedancia compleja para cada frecuencia
 Z_values = np.array([my_driver.impedance(f) for f in frequencies])
@@ -74,60 +85,98 @@ excursions = velocities / (2 * np.pi * frequencies)                 # Excursión
 excursions_mm = excursions * 1000                                   # Excursión en milímetros
 excursion_ratio = excursions / my_driver.Xmax                       # Excursión normalizada respecto a Xmax
 
+#====================================================================================================================================
+#====================================================================================================================================
+#====================================================================================================================================
+
 # --------------------------------------------
 # Gráfica en panel 2x2 para análisis completo
 # --------------------------------------------
 
-fig, axs = plt.subplots(2, 2, figsize=(12, 10))                     # Crea una figura con 4 subgráficas (2x2)
+fig, axs = plt.subplots(2, 2, figsize=(12, 10))
 
-# 1. Impedancia (módulo y fase)
+# === 1. Impedancia (módulo y fase) ===
 axs[0, 0].set_title("Impedancia y Fase")
 
-ax1 = axs[0, 0]                                                     # Eje principal: módulo de la impedancia
+ax1 = axs[0, 0]                                                     # Eje principal para la impedancia
 ln1 = ax1.semilogx(frequencies, Z_magnitude, 'b-', label="|Z| [Ohm]")
-ax1.set_xlabel("Frecuencia [Hz]")
 ax1.set_ylabel("Impedancia [Ohm]", color='b')
 ax1.tick_params(axis='y', labelcolor='b')
 
-ax2 = ax1.twinx()                                                   # Eje secundario: fase
+ax2 = ax1.twinx()                                                   # Eje secundario para la fase
 ln2 = ax2.semilogx(frequencies, Z_phase, 'r-', label="∠Z [°]")
 ax2.set_ylabel("Fase [°]", color='r')
 ax2.tick_params(axis='y', labelcolor='r')
 
-lns = ln1 + ln2                                                     # Combinar leyendas de ambos ejes
+lns = ln1 + ln2                                                     # Combina las líneas de ambos ejes
 labs = [l.get_label() for l in lns]
 ax1.legend(lns, labs, loc='best')
 
-ax1.grid(True, which="both")                                        # Grid solo en eje primario
-
-# 2. SPL
+# === 2. SPL ===
 axs[0, 1].set_title("Respuesta SPL Estimada")
-axs[0, 1].semilogx(frequencies, SPL_values, label="SPL [dB]")       # Gráfica de la respuesta SPL
-axs[0, 1].set_xlabel("Frecuencia [Hz]")
+ln3 = axs[0, 1].semilogx(frequencies, SPL_values, label="SPL [dB]")
 axs[0, 1].set_ylabel("SPL [dB]")
 axs[0, 1].legend()
-axs[0, 1].grid(True, which="both")
 
-# 3. Velocidad del cono
+# === 3. Velocidad del cono ===
 axs[1, 0].set_title("Velocidad del Cono [m/s]")
-axs[1, 0].semilogx(frequencies, velocities)                         # Gráfica de la velocidad del cono
-axs[1, 0].set_xlabel("Frecuencia [Hz]")
-axs[1, 0].set_ylabel("Velocidad [m/s]")
-axs[1, 0].grid(True, which="both")
+ln4 = axs[1, 0].semilogx(frequencies, velocities, label="Velocidad")
 
-# 4. Excursión pico y relación con Xmax
+# === 4. Excursión pico y relación con Xmax ===
 axs[1, 1].set_title("Excursión pico y relación con Xmax")
-axs[1, 1].semilogx(frequencies, excursions_mm, label="Excursión [mm]")              # Excursión en mm
-axs[1, 1].semilogx(frequencies, excursion_ratio, "--", label="Excursión/Xmax")      # Excursión normalizada
-axs[1, 1].axhline(1, color="red", linestyle=":", label="Límite Xmax")               # Línea horizontal en Xmax
-axs[1, 1].set_xlabel("Frecuencia [Hz]")
-axs[1, 1].set_ylabel("Excursión [mm] / Ratio")
+ln5 = axs[1, 1].semilogx(frequencies, excursions_mm, label="Excursión [mm]")
+ln6 = axs[1, 1].semilogx(frequencies, excursion_ratio, "--", label="Excursión/Xmax")
+axs[1, 1].axhline(1, color="red", linestyle=":", label="Límite Xmax")
 axs[1, 1].legend()
-axs[1, 1].grid(True, which="both")
-
-# Ajusta márgenes y muestra las gráficas
-plt.tight_layout()
-plt.show()
 
 # --------------------------------------------
+# Configuración de ticks log + fijos + formato bonito
+# --------------------------------------------
+
+custom_ticks = [10, 100, 1000, 10000, 15000, 20000]
+
+for ax in axs.flat:
+    ax.set_xscale('log')
+    ax.set_xlim([10, 20000])
+    ax.xaxis.set_major_locator(FixedLocator(custom_ticks))
+    ax.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
+    ax.xaxis.set_major_formatter(ScalarFormatter())
+    ax.grid(True, which="both")
+    ax.set_xlabel("Frecuencia [Hz]")
+
+ax2.set_xlim([10, 20000])                                           # Configura el eje x del segundo eje (fase)
+ax2.xaxis.set_major_locator(FixedLocator(custom_ticks))
+ax2.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
+ax2.xaxis.set_major_formatter(ScalarFormatter())
+
+def fmt_ticks(x, pos):                                              # Formatea los ticks del eje x para mostrar en kHz si es mayor a 1000 Hz.
+
+    if x >= 1000:
+        return f"{x/1000:.0f}k"
+    else:
+        return f"{x:.0f}"
+
+for ax in axs.flat:
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(fmt_ticks))
+ax2.xaxis.set_major_formatter(plt.FuncFormatter(fmt_ticks))
+
+def cursor_fmt(sel):                                                # Formatea el texto del cursor al pasar por encima de los puntos
+    x = sel.target[0]
+    y = sel.target[1]
+    if x >= 1000:
+        x_label = f"{x/1000:.1f}k"
+    else:
+        x_label = f"{x:.0f}"
+    sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f}")
+
+cursor = mplcursors.cursor(lns + ln3 + ln4 + ln5 + ln6, hover=True)
+cursor.connect("add", cursor_fmt)
+
+plt.tight_layout()                                                  # Ajusta el layout para evitar solapamientos
+plt.show()                                                          # Muestra la gráfica en una ventana interactiva
+
+#====================================================================================================================================
+#====================================================================================================================================
+#====================================================================================================================================
+
 # Fin del script principal
