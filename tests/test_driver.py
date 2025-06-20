@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 # ------------------------
-# Parámetros base comunes
+# Parámetros base comunes para todos los tests
 # ------------------------
 params = {
     "Fs": 40,
@@ -20,7 +20,7 @@ params = {
 }
 
 # ------------------------
-# 1) Impedancia
+# Test: La impedancia debe ser un número complejo y su parte real positiva
 # ------------------------
 def test_impedance_is_complex():
     driver = Driver(params)
@@ -34,7 +34,7 @@ def test_impedance_return_type():
     assert isinstance(Z, complex), "Impedancia debe ser compleja"
 
 # ------------------------
-# 2) SPL
+# Test: El SPL debe ser un número realista y dentro de un rango físico razonable
 # ------------------------
 def test_spl_response_valid():
     driver = Driver(params)
@@ -43,7 +43,7 @@ def test_spl_response_valid():
     assert 70 < spl < 120, f"SPL parece irreal: {spl} dB"
 
 # ------------------------
-# 3) Derivados positivos
+# Test: Los parámetros derivados deben ser positivos
 # ------------------------
 def test_derived_parameters_positive():
     driver = Driver(params)
@@ -52,7 +52,9 @@ def test_derived_parameters_positive():
     assert driver.Rms > 0, f"Rms debe ser positivo: {driver.Rms}"
 
 # ------------------------
-# 4) Consistencia física: Kms ≈ Mms * w0², Cms ≈ 1/Kms
+# Test: Consistencia física entre Kms, Mms y Cms
+#  - Kms ≈ Mms * w0²
+#  - Cms ≈ 1/Kms
 # ------------------------
 def test_physical_consistency():
     driver = Driver(params)
@@ -62,7 +64,8 @@ def test_physical_consistency():
     assert driver.Cms == pytest.approx(1 / kms, rel=1e-3), f"Cms inconsistente con Kms"
 
 # ------------------------
-# 5) Excursión pico: baja frecuencia >> alta frecuencia
+# Test: La excursión pico debe ser mayor en baja frecuencia que en alta frecuencia
+# Además, la excursión en bajas frecuencias debe ser significativa respecto a Xmax
 # ------------------------
 def test_excursion_behavior():
     driver = Driver(params)
