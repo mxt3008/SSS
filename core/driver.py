@@ -13,6 +13,8 @@ class Driver:
 
         # Parámetros mecánicos
         self.Fs = params.get("Fs", 40)                  # Frecuencia de resonancia, en Hz
+        self.Mms = params.get("Mms", None)              # Masa móvil (opcional)
+        self.Cms = params.get("Cms", None)              # Compliancia mecánica, en m/N
 
         # Parámetros eléctricos
         self.Re = params.get("Re", 6.0)                 # Resistencia DC de la bobina, en Ohm
@@ -32,18 +34,6 @@ class Driver:
         if self.Sd <= 0:                                # Área del diafragma debe ser mayor que cero
             raise ValueError("El área Sd debe ser mayor que cero para convertir Cms a Vas.")       
         self.Xmax = params.get("Xmax", 0.005)           # Excursión máxima lineal, en m
-
-        # -------------------------------
-        # Cálculo de parámetros derivados
-        # ------------------------------
-        self.resolve_Mms_Cms_Fs()
-
-        # Derivar Kms y Rms
-        self.Kms = 1 / self.Cms
-        self.Rms = self.derive_Rms()
-
-        # Derivar Vas realista usando Cms y condiciones reales
-        self.Vas = self.derive_Vas()
 
         # -------------------------------
         # Condiciones ambientales y físicas
@@ -67,6 +57,19 @@ class Driver:
         self.rho0 = self.P0 / (self.R * self.T0)
         self.c = np.sqrt(self.gamma * self.R * self.T0)
 
+        # -------------------------------
+        # Cálculo de parámetros derivados
+        # ------------------------------
+
+        self.resolve_Mms_Cms_Fs()
+
+        # Derivar Kms y Rms
+        self.Kms = 1 / self.Cms
+        self.Rms = self.derive_Rms()
+
+        # Derivar Vas realista usando Cms y condiciones reales
+        self.Vas = self.derive_Vas()
+
 # -----------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------
@@ -75,14 +78,33 @@ class Driver:
         # Resumen en consola
         # -------------------------------
         print(f"""
-        Driver parameters:
-          Fs  = {self.Fs:.2f} Hz
-          Mms = {self.Mms:.5f} kg
-          Cms = {self.Cms:.6e} m/N
-          Vas = {self.Vas:.2f} L
-          Rms = {self.Rms:.5f} kg/s
-          rho0 = {self.rho0:.3f} kg/m³
-          c = {self.c:.2f} m/s
+        ===========================================
+        DRIVER PARAMETERS
+        ===========================================
+
+        Parámetros primarios:
+        Fs    = {self.Fs:.2f} Hz         (Frecuencia de resonancia)
+        Re    = {self.Re:.3f} Ohm        (Resistencia DC)
+        Le    = {self.Le*1e3:.3f} mH     (Inductancia)
+        Bl    = {self.Bl:.3f} T·m        (Factor motor)
+        Sd    = {self.Sd*1e4:.2f} cm²    (Área efectiva del diafragma)
+        Vas   = {self.Vas:.2f} L         (Volumen de aire equivalente)
+        Qts   = {self.Qts:.3f}           (Factor de calidad total)
+        Qes   = {self.Qes:.3f}           (Factor de calidad eléctrico)
+        Qms   = {self.Qms():.3f}         (Factor de calidad mecánico)
+        Xmax  = {self.Xmax*1e3:.2f} mm   (Excursión máxima lineal)
+
+        Parámetros derivados:
+        Mms   = {self.Mms*1e3:.3f} g     (Masa móvil)
+        Cms   = {self.Cms*1e3:.3f} mm/N  (Compliancia)
+        Kms   = {self.Kms:.3f} N/m       (Rigidez mecánica)
+        Rms   = {self.Rms:.5f} kg/s      (Resistencia mecánica)
+
+        Constantes físicas:
+        rho0  = {self.rho0:.3f} kg/m³    (Densidad del aire)
+        c     = {self.c:.2f} m/s         (Velocidad del sonido)
+
+        ===========================================
         """)
 
 # -----------------------------------------------------------------------------------------------------------
@@ -90,23 +112,30 @@ class Driver:
 # -----------------------------------------------------------------------------------------------------------
 
     def resolve_Mms_Cms_Fs(self):
-        if self.Fs and self.Mms and self.Cms:
-            # Verificar coherencia: Fs calculado debe coincidir.
+    # Debes tener al menos dos parámetros conocidos
+        known = sum(x is not None for x in [self.Fs, self.Mms, self.Cms])
+        if known < 2:
+            raise ValueError("Debes definir al menos dos de: Fs, Mms, Cms.")
+
+    # Caso 1: los tres definidos: verifica coherencia
+        if self.Fs is not None and self.Mms is not None and self.Cms is not None:
             w0 = np.sqrt(1 / (self.Cms * self.Mms))
             Fs_check = w0 / (2 * np.pi)
             if abs(Fs_check - self.Fs) > 0.5:
-                print(f"⚠️ Advertencia: Fs, Mms y Cms no son coherentes entre sí. Fs calculado = {Fs_check:.2f} Hz")
-        elif self.Fs and self.Mms and not self.Cms:
+                print(f"⚠️ Advertencia: Fs, Mms y Cms no son coherentes. Fs esperado = {Fs_check:.2f} Hz")
+        # Caso 2: Fs y Mms conocidos → calcula Cms
+        elif self.Fs is not None and self.Mms is not None:
             w0 = 2 * np.pi * self.Fs
             self.Cms = 1 / (self.Mms * w0**2)
-        elif self.Fs and self.Cms and not self.Mms:
+        # Caso 3: Fs y Cms conocidos → calcula Mms
+        elif self.Fs is not None and self.Cms is not None:
             w0 = 2 * np.pi * self.Fs
             self.Mms = 1 / (w0**2 * self.Cms)
-        elif self.Mms and self.Cms and not self.Fs:
+        # Caso 4: Mms y Cms conocidos → calcula Fs
+        elif self.Mms is not None and self.Cms is not None:
             w0 = np.sqrt(1 / (self.Cms * self.Mms))
             self.Fs = w0 / (2 * np.pi)
-        else:
-            raise ValueError("Debes definir al menos dos de: Fs, Mms, Cms.")
+
 
 
     def derive_Vas(self):

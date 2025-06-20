@@ -6,9 +6,11 @@ import pytest
 
 # ------------------------
 # Parámetros base comunes para todos los tests
+# Incluye al menos dos de {Fs, Mms, Cms}
 # ------------------------
 params = {
     "Fs": 40,
+    "Mms": 0.02,  # Opcional - para evitar ValueError (20 gramos)
     "Vas": 50,
     "Qts": 0.35,
     "Qes": 0.4,
@@ -25,13 +27,8 @@ params = {
 def test_impedance_is_complex():
     driver = Driver(params)
     Z = driver.impedance(40)
-    assert isinstance(Z, complex), "Impedancia debe ser un número complejo"
-    assert Z.real > 0, "Parte real de la impedancia debe ser positiva"
-
-def test_impedance_return_type():
-    driver = Driver(params)
-    Z = driver.impedance(100)
     assert isinstance(Z, complex), "Impedancia debe ser compleja"
+    assert Z.real > 0, "Parte real de la impedancia debe ser positiva"
 
 # ------------------------
 # Test: El SPL debe ser un número realista y dentro de un rango físico razonable
@@ -50,6 +47,9 @@ def test_derived_parameters_positive():
     assert driver.Mms > 0, f"Mms debe ser positivo: {driver.Mms}"
     assert driver.Cms > 0, f"Cms debe ser positivo: {driver.Cms}"
     assert driver.Rms > 0, f"Rms debe ser positivo: {driver.Rms}"
+    assert driver.Kms > 0, f"Kms debe ser positivo: {driver.Kms}"
+    assert driver.rho0 > 0, f"rho0 debe ser positivo: {driver.rho0}"
+    assert driver.c > 0, f"c debe ser positivo: {driver.c}"
 
 # ------------------------
 # Test: Consistencia física entre Kms, Mms y Cms
@@ -59,9 +59,9 @@ def test_derived_parameters_positive():
 def test_physical_consistency():
     driver = Driver(params)
     w0 = 2 * np.pi * driver.Fs
-    kms = driver.derive_Kms()
-    assert kms == pytest.approx(driver.Mms * w0**2, rel=1e-3), f"Kms inconsistente"
-    assert driver.Cms == pytest.approx(1 / kms, rel=1e-3), f"Cms inconsistente con Kms"
+    kms = driver.Kms  # Usar el Kms derivado en __init__, no recalcular
+    assert kms == pytest.approx(driver.Mms * w0**2, rel=1e-3), "Kms inconsistente con Mms y Fs"
+    assert driver.Cms == pytest.approx(1 / kms, rel=1e-3), "Cms inconsistente con Kms"
 
 # ------------------------
 # Test: La excursión pico debe ser mayor en baja frecuencia que en alta frecuencia
@@ -76,7 +76,24 @@ def test_excursion_behavior():
     assert excursion_low > excursion_high, (
         f"Excursión inesperada: baja={excursion_low:.4e} m, alta={excursion_high:.4e} m"
     )
-    # Además, prueba que la excursión en bajas frecuencias excede Xmax
     assert excursion_low > driver.Xmax * 0.5, (
-        f"Excursión baja frecuencia debería ser significativa respecto a Xmax"
+        "Excursión en baja frecuencia debería ser significativa respecto a Xmax"
     )
+
+# ------------------------
+# Test: La densidad del aire y la velocidad del sonido deben ser consistentes con la temperatura y presión
+# ------------------------
+def test_air_properties():
+    driver = Driver(params)
+    # Valores típicos a 20°C y 101325 Pa: rho0 ≈ 1.204 kg/m³, c ≈ 343 m/s
+    assert 1.1 < driver.rho0 < 1.3, f"rho0 fuera de rango típico: {driver.rho0}"
+    assert 340 < driver.c < 350, f"c fuera de rango típico: {driver.c}"
+
+# ------------------------
+# Test: La eficiencia debe ser un valor pequeño y positivo
+# ------------------------
+def test_efficiency():
+    driver = Driver(params)
+    eta = driver.efficiency()
+    assert eta > 0, f"Eficiencia debe ser positiva: {eta}"
+    assert eta < 0.1, f"Eficiencia irrealmente alta: {eta}"
