@@ -77,7 +77,9 @@ class Driver:
 
         # -------------------------------
         # Resumen en consola
+        # Imprime los parámetros del driver de forma legible
         # -------------------------------
+        
         print(f"""
         ===========================================
         DRIVER PARAMETERS
@@ -119,23 +121,23 @@ class Driver:
             raise ValueError("Debes definir al menos dos de: Fs, Mms, Cms.")
 
         # Caso 1: Fs, Mms y Cms conocidos → verifica consistencia
-        if self.Fs is not None and self.Mms is not None and self.Cms is not None:
-            w0 = np.sqrt(1 / (self.Cms * self.Mms))
-            Fs_check = w0 / (2 * np.pi)
-            if abs(Fs_check - self.Fs) > 0.5:
+        if self.Fs is not None and self.Mms is not None and self.Cms is not None: 
+            w0 = np.sqrt(1 / (self.Cms * self.Mms))                     # Frecuencia angular de resonancia
+            Fs_check = w0 / (2 * np.pi)                                 # Frecuencia de resonancia calculada
+            if abs(Fs_check - self.Fs) > 0.5:                           # Tolerancia de 0.5 Hz para la consistencia
                 print(f"⚠️ Advertencia: Fs, Mms y Cms no son coherentes. Fs esperado = {Fs_check:.2f} Hz")
-        # Caso 2: Fs y Mms conocidos → calcula Cms
-        elif self.Fs is not None and self.Mms is not None:
-            w0 = 2 * np.pi * self.Fs
-            self.Cms = 1 / (self.Mms * w0**2)
-        # Caso 3: Fs y Cms conocidos → calcula Mms
-        elif self.Fs is not None and self.Cms is not None:
-            w0 = 2 * np.pi * self.Fs
-            self.Mms = 1 / (w0**2 * self.Cms)
-        # Caso 4: Mms y Cms conocidos → calcula Fs
-        elif self.Mms is not None and self.Cms is not None:
-            w0 = np.sqrt(1 / (self.Cms * self.Mms))
-            self.Fs = w0 / (2 * np.pi)
+        
+        elif self.Fs is not None and self.Mms is not None:              # Caso 2: Fs y Mms conocidos → calcula Cms
+            w0 = 2 * np.pi * self.Fs                                    # Frecuencia angular de resonancia
+            self.Cms = 1 / (self.Mms * w0**2)                           # Cms = 1 / (Mms * w0²), donde w0 es la frecuencia angular de resonancia
+        
+        elif self.Fs is not None and self.Cms is not None:              # Caso 3: Fs y Cms conocidos → calcula Mms
+            w0 = 2 * np.pi * self.Fs                                    # Frecuencia angular de resonancia
+            self.Mms = 1 / (w0**2 * self.Cms)                           # Mms = 1 / (w0² * Cms), donde w0 es la frecuencia angular de resonancia
+        
+        elif self.Mms is not None and self.Cms is not None:             # Caso 4: Mms y Cms conocidos → calcula Fs
+            w0 = np.sqrt(1 / (self.Cms * self.Mms))                     # Frecuencia angular de resonancia
+            self.Fs = w0 / (2 * np.pi)                                  # Fs = w0 / (2 * pi), donde w0 es la frecuencia angular de resonancia
 
 #====================================================================================================================================
 
@@ -143,113 +145,188 @@ class Driver:
         if "Vas" in self.__dict__ and self.Vas != 50:                   # 50 es el default, ajustar de ser necesario
             return self.Vas
         else:
-            Caa = self.Cms * self.Sd**2
-            Vas_m3 = Caa * self.rho0 * self.c**2 / self.P0
+            Caa = self.Cms * self.Sd**2                                 # Compliancia acústica del diafragma
+            Vas_m3 = Caa * self.rho0 * self.c**2 / self.P0              # Vas en m³ a partir de Cms, densidad del aire y velocidad del sonido
             return Vas_m3 * 1e3                                         # m³ a litros
 
 #====================================================================================================================================
 
     def derive_Rms(self):                                               # Deriva Rms a partir de Cms, Mms y Fs
-        w0 = 2 * np.pi * self.Fs
-        return self.Mms * w0 / self.Qms()
+        w0 = 2 * np.pi * self.Fs                                        # Frecuencia angular de resonancia
+        return self.Mms * w0 / self.Qms()                               # Rms = Mms * w0 / Qms, donde Qms es el factor de calidad mecánico
     
 #====================================================================================================================================
 
     def Qms(self):                                                      # Deriva Qms a partir de Cms, Mms y Fs
-        if self.Qms_user:
+        if self.Qms_user:                                               # Si Qms fue definido por el usuario, lo retorna directamente
             return self.Qms_user
         else:
-            return (self.Qts * self.Qes) / (self.Qes - self.Qts)
+            return (self.Qts * self.Qes) / (self.Qes - self.Qts)        # Qms = Qts * Qes / (Qes - Qts)
         
 #====================================================================================================================================
 
     def derive_Kms(self):                                               # Deriva Kms a partir de Cms
-        return 1 / self.Cms
+        return 1 / self.Cms                                             # Kms = 1 / Cms, donde Cms es la compliancia mecánica del driver
     
 #====================================================================================================================================
 
     def impedance(self, f):                                             # Impedancia del driver a una frecuencia f
-        w = 2 * np.pi * f
-        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
-        Ze = self.Re + 1j*w*self.Le + (self.Bl**2) / Zm
+        w = 2 * np.pi * f                                               # Frecuencia angular
+        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)               # Impedancia mecánica del driver
+        Ze = self.Re + 1j*w*self.Le + (self.Bl**2) / Zm                 # Impedancia eléctrica del driver
         return Ze
     
 #====================================================================================================================================
 
     def velocity(self, f):                                              # Velocidad del diafragma a una frecuencia f
-        w = 2 * np.pi * f
-        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
-        return self.Bl / Zm
+        w = 2 * np.pi * f                                               # Frecuencia angular
+        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)               # Impedancia mecánica del driver
+        return self.Bl / Zm                                             # Velocidad del diafragma, V = Bl / Zm
     
 #====================================================================================================================================
-    
     # ===============================
-    # SPL en 2π sin directividad
+    # SPL hemisférico ideal (2π)
+    # SPL teórico en campo libre hemisférico (2π estereorradianes), a 1 metro, sin aplicar directividad.
     # ===============================
     def spl_2pi(self, f, U=2.83):
-        """
-        SPL teórico hemisférico (2π) a 1 m, sin directividad.
-        Coincide con 'Total SPL 2pi' de VituixCAD.
-        """
-        Z = self.impedance(f)
-        I = U / abs(Z)
-        v = self.velocity(f) * I
-        w = 2 * np.pi * f
-        r = 1.0
-        p = 1j * w * self.rho0 * v * self.Sd / (2 * np.pi * r)  # Hemisferio: 2π
-        p_ref = 20e-6
-        return 20 * np.log10(np.abs(p) / p_ref)
+
+        Z = self.impedance(f)                                           # Impedancia eléctrica del driver a la frecuencia f
+        if np.abs(Z) == 0:                                              # Evita división por cero
+            raise ValueError("La impedancia Z es cero, no se puede calcular SPL.")
+                
+        I = U / Z                                                       # Corriente RMS a partir del voltaje RMS U
+        if np.abs(I) == 0:                                              # Evita división por cero
+            raise ValueError("La corriente I es cero, no se puede calcular SPL.")
+        
+        v = self.velocity(f) * I                                        # Velocidad promedio del pistón a la frecuencia f
+        if np.abs(v) == 0:                                              # Evita división por cero
+            raise ValueError("La velocidad v es cero, no se puede calcular SPL.")
+
+        # Presión de radiación: para pistón en campo lejano hemisférico
+        # Formula estándar: p = j*w*rho0*v*Sd / (2π*r) para hemisferio
+        w = 2 * np.pi * f                                               # frecuencia angular
+        k = w / self.c                                                  # número de onda
+        if self.rho0 <= 0 or self.c <= 0:                               # Verifica que la densidad y velocidad del sonido sean válidas
+            raise ValueError("Densidad del aire o velocidad del sonido no válidas.")
+        
+        r = 1.0                                                         # distancia 1 metro
+        if r <= 0:                                                      # Verifica que la distancia sea positiva
+            raise ValueError("La distancia r debe ser mayor que cero.")
+        
+        p = 1j*w*self.rho0*v*self.Sd *np.exp(-1j*k*r)/(2*np.pi*r)       # Presión acústica a 1 metro, considerando radiación hemisférica
+        if np.abs(p) == 0:                                              # Evita división por cero al calcular SPL
+            raise ValueError("La presión acústica p es cero, no se puede calcular SPL.")
+
+        # SPL: 20*log10(|p| / p_ref)
+        p_ref = 20e-6                                                   # Presión de referencia en Pa (20 µPa)
+        if p_ref <= 0:                                                  # Verifica que la presión de referencia sea positiva
+            raise ValueError("La presión de referencia p_ref debe ser mayor que cero.")
+        
+        if np.abs(p_ref) == 0:                                          # Evita división por cero al calcular SPL
+            raise ValueError("La presión de referencia p_ref no puede ser cero.")
+        
+        SPL = 20 * np.log10(np.abs(p) / p_ref) #                      # Nivel de presión sonora en dB a 1 metro
+        if np.isnan(SPL) or np.isinf(SPL):                             # Verifica si SPL es NaN o infinito
+            raise ValueError("El cálculo de SPL resultó en un valor no válido (NaN o infinito).")
+
+        return SPL
 
     # ===============================
-    # SPL TOTAL con directividad de pistón
+    # SPL TOTAL con directividad real. 
+    # Este método calcula el SPL total a 1 metro, considerando:
+    # - Radiación hemisférica (2π) 
+    # - Directividad de pistón circular en baffle infinito.
     # ===============================
+
     def spl_total(self, f, U=2.83):
-        """
-        SPL considerando directividad de pistón circular.
-        """
-        Z = self.impedance(f)
-        I = U / abs(Z)
-        v = self.velocity(f) * I
 
-        w = 2 * np.pi * f
-        k = w / self.c
-        a = np.sqrt(self.Sd / np.pi)
-        ka = k * a
+        Z = self.impedance(f)                                           # Impedancia eléctrica del driver a la frecuencia f
+        if np.abs(Z) == 0:                                              # Evita división por cero
+            raise ValueError("La impedancia Z es cero, no se puede calcular SPL.")
+                
+        I = U / np.abs(Z)                                               # Corriente RMS a partir del voltaje RMS U
+        if np.abs(I) == 0:                                              # Evita división por cero
+            raise ValueError("La corriente I es cero, no se puede calcular SPL.")
+        
+        v = self.velocity(f) * I                                        # Velocidad promedio del pistón a la frecuencia f
+        if np.abs(v) == 0:                                              # Evita división por cero
+            raise ValueError("La velocidad v es cero, no se puede calcular SPL.")
 
-        # Factor de directividad robusto
-        D = np.ones_like(ka)
-        mask = ka != 0
-        D[mask] = 2 * j1(ka[mask]) / ka[mask]
+        # 4. Factor de directividad: pistón circular en campo lejano.
+        # D(ka) = 2 * J1(ka) / ka
+        w = 2 * np.pi * f                                               # frecuencia angular
+        k = w / self.c                                                  # número de onda
+        a = np.sqrt(self.Sd / np.pi)                                    # radio equivalente del área Sd
+        ka = k * a                                                      # producto del número de onda y el radio
+        if np.isscalar(ka):                                             # Si ka es un escalar, calcula D directamente
+            D = 1.0 if ka == 0 else 2 * j1(ka) / ka                     # Evita división por cero
 
-        r = 1.0
-        p = 1j * w * self.rho0 * v * self.Sd * D / (2 * np.pi * r)
-        p_ref = 20e-6
-        return 20 * np.log10(np.abs(p) / p_ref)
+        D = np.ones_like(ka)                                            # Inicializa D como un array de unos
+        mask = ka != 0                                                  # Máscara para evitar división por cero
+        D[mask] = 2 * j1(ka[mask]) / ka[mask]                           # Calcula D solo donde ka no es cero
+        # Nota: j1 es la función Bessel de primer orden, que se usa para calcular la directividad del pistón circular.
+        if np.any(np.isnan(D)) or np.any(np.isinf(D)):                  # Verifica si D contiene NaN o infinito
+            raise ValueError("El cálculo de la directividad D resultó en un valor no válido (NaN o infinito).")
+
+        # 5. Presión con directividad:
+        # p = j*w*rho0*v*Sd*D / (2π*r)
+        r = 1.0                                                         # distancia 1 metro
+        p = 1j * w * self.rho0 * v * self.Sd * D / (2 * np.pi * r) #    # Presión acústica a 1 metro, considerando radiación hemisférica y directividad
+        if np.abs(p) == 0:                                              # Evita división por cero al calcular SPL
+            raise ValueError("La presión acústica p es cero, no se puede calcular SPL.")
+
+        # 6. SPL: 20*log10(|p| / p_ref)
+        p_ref = 20e-6                                                   # Presión de referencia en Pa (20 µPa)
+        if p_ref <= 0:                                                  # Verifica que la presión de referencia sea positiva
+            raise ValueError("La presión de referencia p_ref debe ser mayor que cero.")
+        SPL = 20 * np.log10(np.abs(p) / p_ref) #                        # Nivel de presión sonora en dB a 1 metro
+        if np.isnan(SPL) or np.isinf(SPL):                              # Verifica si SPL es NaN o infinito
+            raise ValueError("El cálculo de SPL resultó en un valor no válido (NaN o infinito).")
+
+        return SPL
 
     # ===============================
-    # FASE del SPL
+    # FASE del SPL TOTAL
+    # Esta función calcula la fase de la presión acústica considerando:
+    # - Radiación hemisférica (2π)
+    # - Directividad de pistón circular.
     # ===============================
+
     def spl_phase(self, f, U=2.83):
-        """
-        Fase de la presión acústica considerando directividad.
-        Coincide con 'Total Phase' de VituixCAD.
-        """
-        Z = self.impedance(f)
-        I = U / abs(Z)
-        v = self.velocity(f) * I
-        w = 2 * np.pi * f
-        k = w / self.c
-        a = np.sqrt(self.Sd / np.pi)
-        ka = k * a
-        if np.isscalar(f):
-            D = 1.0 if ka == 0 else 2 * j1(ka) / ka
+
+        Z = self.impedance(f)                                           # Impedancia eléctrica del driver a la frecuencia f
+        if np.abs(Z) == 0:                                              # Evita división por cero
+            raise ValueError("La impedancia Z es cero, no se puede calcular SPL.")
+                
+        I = U / np.abs(Z)                                               # Corriente RMS a partir del voltaje RMS U
+        if np.abs(I) == 0:                                              # Evita división por cero
+            raise ValueError("La corriente I es cero, no se puede calcular SPL.")
+        
+        v = self.velocity(f) * I                                        # Velocidad promedio del pistón a la frecuencia f
+        if np.abs(v) == 0:                                              # Evita división por cero
+            raise ValueError("La velocidad v es cero, no se puede calcular SPL.")
+
+        # 4. Factor de directividad igual que SPL_total
+        w = 2 * np.pi * f                                               # frecuencia angular
+        k = w / self.c                                                  # número de onda
+        a = np.sqrt(self.Sd / np.pi)                                    # radio equivalente del área Sd
+        ka = k * a                                                      # producto del número de onda y el radio
+
+        if np.isscalar(f):                                              # Si f es un escalar, calcula D directamente
+            D = 1.0 if ka == 0 else 2 * j1(ka) / ka                     # Evita división por cero
         else:
-            D = np.ones_like(ka)
-            D[ka != 0] = 2 * j1(ka[ka != 0]) / ka[ka != 0]
-        r = 1.0
-        p = 1j * w * self.rho0 * v * self.Sd * D / (4 * np.pi * r)
-        return np.angle(p, deg=True)
-    
+            D = np.ones_like(ka)                                        # Inicializa D como un array de unos
+            D[ka != 0] = 2 * j1(ka[ka != 0]) / ka[ka != 0]              # Calcula D solo donde ka no es cero
+
+        # 5. Presión compleja
+        r = 1.0                                                         # distancia 1 metro
+        p = 1j * w * self.rho0 * v * self.Sd * D / (2 * np.pi * r)      # Presión acústica a 1 metro, considerando radiación hemisférica y directividad
+
+        # 6. Fase en grados
+        phase_deg = np.angle(p, deg=True)                               # Calcula la fase de la presión acústica en grados
+
+        return phase_deg
+
 #====================================================================================================================================
 
     def efficiency(self):                                               # Deriva la eficiencia del driver
