@@ -130,46 +130,59 @@ axs[1, 1].axhline(1, color="red", linestyle=":", label="Límite Xmax")
 axs[1, 1].legend()
 
 # --------------------------------------------
-# Configuración de ticks log + fijos + formato bonito
+# Configuración de ticks y formato de ejes
 # --------------------------------------------
 
 custom_ticks = [10, 100, 1000, 10000, 15000, 20000]
 
-for ax in axs.flat:
-    ax.set_xscale('log')
-    ax.set_xlim([10, 20000])
-    ax.xaxis.set_major_locator(FixedLocator(custom_ticks))
-    ax.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
-    ax.xaxis.set_major_formatter(ScalarFormatter())
-    ax.grid(True, which="both")
-    ax.set_xlabel("Frecuencia [Hz]")
-
-ax2.set_xlim([10, 20000])                                           # Configura el eje x del segundo eje (fase)
-ax2.xaxis.set_major_locator(FixedLocator(custom_ticks))
-ax2.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
-ax2.xaxis.set_major_formatter(ScalarFormatter())
-
 def fmt_ticks(x, pos):                                              # Formatea los ticks del eje x para mostrar en kHz si es mayor a 1000 Hz.
-
     if x >= 1000:
         return f"{x/1000:.0f}k"
     else:
         return f"{x:.0f}"
 
 for ax in axs.flat:
-    ax.xaxis.set_major_formatter(plt.FuncFormatter(fmt_ticks))
-ax2.xaxis.set_major_formatter(plt.FuncFormatter(fmt_ticks))
+    ax.set_xscale('log')
+    ax.set_xlim([10, 20000])
+    ax.xaxis.set_major_locator(FixedLocator(custom_ticks))
+    ax.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(fmt_ticks))
+    ax.grid(True, which="both")
+    ax.set_xlabel("Frecuencia [Hz]")
 
-def cursor_fmt(sel):                                                # Formatea el texto del cursor al pasar por encima de los puntos
+ax2.set_xlim([10, 20000])                                           # Configura el eje x del segundo eje (fase)
+ax2.xaxis.set_major_locator(FixedLocator(custom_ticks))
+ax2.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
+ax2.xaxis.set_major_formatter(ticker.FuncFormatter(fmt_ticks))
+
+def cursor_fmt(sel):                                                # Formatea el texto del cursor interactivo
     x = sel.target[0]
     y = sel.target[1]
+
     if x >= 1000:
         x_label = f"{x/1000:.1f}k"
     else:
         x_label = f"{x:.0f}"
-    sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f}")
 
-cursor = mplcursors.cursor(lns + ln3 + ln4 + ln5 + ln6, hover=True)
+    label = sel.artist.get_label()                                  # Detecta la curva y asigna unidad Y
+    if "|Z|" in label:
+        y_unit = "Ω"
+    elif "∠Z" in label:
+        y_unit = "°"
+    elif "SPL" in label:
+        y_unit = "dB"
+    elif "Velocidad" in label:
+        y_unit = "m/s"
+    elif "Excursión/Xmax" in label:
+        y_unit = "(ratio)"
+    elif "Excursión" in label:
+        y_unit = "mm"
+    else:
+        y_unit = ""
+
+    sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
+
+cursor = mplcursors.cursor(lns + ln3 + ln4 + ln5 + ln6, hover=True) # Añade cursores interactivos a las líneas
 cursor.connect("add", cursor_fmt)
 
 plt.tight_layout()                                                  # Ajusta el layout para evitar solapamientos
