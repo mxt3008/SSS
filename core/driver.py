@@ -2,7 +2,8 @@
 # Inicializa un objeto Driver con parámetros eléctricos, mecánicos y geométricos. Calcula parámetros derivados necesarios para modelos de impedancia y SPL.
 # --------------------------------------------
 
-import numpy as np  # Importa numpy para cálculos matemáticos complejos
+import numpy as np                          # Importa numpy para cálculos matemáticos complejos
+from scipy.special import j1                # Importa la función Bessel de primer orden para cálculos de SPL - Directividad del pistón
 
 class Driver:
     def __init__(self, params):
@@ -70,9 +71,9 @@ class Driver:
         # Derivar Vas realista usando Cms y condiciones reales
         self.Vas = self.derive_Vas()
 
-# -----------------------------------------------------------------------------------------------------------
-# -----------------------------------------------------------------------------------------------------------
-# -----------------------------------------------------------------------------------------------------------
+#====================================================================================================================================
+#====================================================================================================================================
+#====================================================================================================================================
 
         # -------------------------------
         # Resumen en consola
@@ -107,17 +108,17 @@ class Driver:
         ===========================================
         """)
 
-# -----------------------------------------------------------------------------------------------------------
-# -----------------------------------------------------------------------------------------------------------
-# -----------------------------------------------------------------------------------------------------------
+#====================================================================================================================================
+#====================================================================================================================================
+#====================================================================================================================================
 
-    def resolve_Mms_Cms_Fs(self):
-    # Debes tener al menos dos parámetros conocidos
-        known = sum(x is not None for x in [self.Fs, self.Mms, self.Cms])
+    def resolve_Mms_Cms_Fs(self):                                       # Resuelve Mms, Cms y Fs según los parámetros disponibles
+        # Verifica que al menos dos de los parámetros Fs, Mms y Cms estén definidos
+        known = sum(x is not None for x in [self.Fs, self.Mms, self.Cms]) 
         if known < 2:
             raise ValueError("Debes definir al menos dos de: Fs, Mms, Cms.")
 
-    # Caso 1: los tres definidos: verifica coherencia
+        # Caso 1: Fs, Mms y Cms conocidos → verifica consistencia
         if self.Fs is not None and self.Mms is not None and self.Cms is not None:
             w0 = np.sqrt(1 / (self.Cms * self.Mms))
             Fs_check = w0 / (2 * np.pi)
@@ -136,56 +137,122 @@ class Driver:
             w0 = np.sqrt(1 / (self.Cms * self.Mms))
             self.Fs = w0 / (2 * np.pi)
 
+#====================================================================================================================================
 
-
-    def derive_Vas(self):
-        # Usa Vas de catálogo si fue dado explícitamente
-        if "Vas" in self.__dict__ and self.Vas != 50:  # 50 es el default, ajusta si quieres
+    def derive_Vas(self):                                               # Deriva Vas a partir de Cms, Mms y Fs
+        if "Vas" in self.__dict__ and self.Vas != 50:                   # 50 es el default, ajustar de ser necesario
             return self.Vas
         else:
             Caa = self.Cms * self.Sd**2
             Vas_m3 = Caa * self.rho0 * self.c**2 / self.P0
-            return Vas_m3 * 1e3  # m³ a litros
+            return Vas_m3 * 1e3                                         # m³ a litros
 
+#====================================================================================================================================
 
-    def derive_Rms(self):
+    def derive_Rms(self):                                               # Deriva Rms a partir de Cms, Mms y Fs
         w0 = 2 * np.pi * self.Fs
         return self.Mms * w0 / self.Qms()
+    
+#====================================================================================================================================
 
-    def Qms(self):
+    def Qms(self):                                                      # Deriva Qms a partir de Cms, Mms y Fs
         if self.Qms_user:
             return self.Qms_user
         else:
             return (self.Qts * self.Qes) / (self.Qes - self.Qts)
+        
+#====================================================================================================================================
 
-    def derive_Kms(self):
+    def derive_Kms(self):                                               # Deriva Kms a partir de Cms
         return 1 / self.Cms
+    
+#====================================================================================================================================
 
-    def impedance(self, f):
-        #Impedancia total
+    def impedance(self, f):                                             # Impedancia del driver a una frecuencia f
         w = 2 * np.pi * f
         Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
         Ze = self.Re + 1j*w*self.Le + (self.Bl**2) / Zm
         return Ze
+    
+#====================================================================================================================================
 
-    def velocity(self, f):
-        #Velocidad del cono para corriente de 1A
+    def velocity(self, f):                                              # Velocidad del diafragma a una frecuencia f
         w = 2 * np.pi * f
         Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
         return self.Bl / Zm
-
-    def spl_response(self, f, Pe=1):
-        #SPL campo libre, r=1m
-        w = 2 * np.pi * f
+    
+#====================================================================================================================================
+    
+    # ===============================
+    # SPL en 2π sin directividad
+    # ===============================
+    def spl_2pi(self, f, U=2.83):
+        """
+        SPL teórico hemisférico (2π) a 1 m, sin directividad.
+        Coincide con 'Total SPL 2pi' de VituixCAD.
+        """
         Z = self.impedance(f)
-        I = np.sqrt(Pe / Z.real)
+        I = U / abs(Z)
         v = self.velocity(f) * I
-        p = 1j * w * self.rho0 * v * self.Sd / (4 * np.pi * 1)
+        w = 2 * np.pi * f
+        r = 1.0
+        p = 1j * w * self.rho0 * v * self.Sd / (2 * np.pi * r)  # Hemisferio: 2π
         p_ref = 20e-6
         return 20 * np.log10(np.abs(p) / p_ref)
 
-    def efficiency(self):
-        #Eficiencia de banda ancha
+    # ===============================
+    # SPL TOTAL con directividad de pistón
+    # ===============================
+    def spl_total(self, f, U=2.83):
+        """
+        SPL considerando directividad de pistón circular.
+        """
+        Z = self.impedance(f)
+        I = U / abs(Z)
+        v = self.velocity(f) * I
+
+        w = 2 * np.pi * f
+        k = w / self.c
+        a = np.sqrt(self.Sd / np.pi)
+        ka = k * a
+
+        # Factor de directividad robusto
+        D = np.ones_like(ka)
+        mask = ka != 0
+        D[mask] = 2 * j1(ka[mask]) / ka[mask]
+
+        r = 1.0
+        p = 1j * w * self.rho0 * v * self.Sd * D / (2 * np.pi * r)
+        p_ref = 20e-6
+        return 20 * np.log10(np.abs(p) / p_ref)
+
+    # ===============================
+    # FASE del SPL
+    # ===============================
+    def spl_phase(self, f, U=2.83):
+        """
+        Fase de la presión acústica considerando directividad.
+        Coincide con 'Total Phase' de VituixCAD.
+        """
+        Z = self.impedance(f)
+        I = U / abs(Z)
+        v = self.velocity(f) * I
+        w = 2 * np.pi * f
+        k = w / self.c
+        a = np.sqrt(self.Sd / np.pi)
+        ka = k * a
+        if np.isscalar(f):
+            D = 1.0 if ka == 0 else 2 * j1(ka) / ka
+        else:
+            D = np.ones_like(ka)
+            D[ka != 0] = 2 * j1(ka[ka != 0]) / ka[ka != 0]
+        r = 1.0
+        p = 1j * w * self.rho0 * v * self.Sd * D / (4 * np.pi * r)
+        return np.angle(p, deg=True)
+    
+#====================================================================================================================================
+
+    def efficiency(self):                                               # Deriva la eficiencia del driver
         w0 = 2 * np.pi * self.Fs
         eta0 = (self.Bl ** 2) / (self.Re * self.rho0 * self.c ** 3 * self.Sd)
         return eta0

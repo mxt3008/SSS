@@ -61,7 +61,9 @@ my_driver = Driver(params)                      # Crea una instancia del driver 
 freq = params["Fs"]                                                 # Usar la frecuencia de resonancia para la prueba puntual
 Z = my_driver.impedance(freq)                                       # Calcula la impedancia compleja a esa frecuencia
 print(f"Impedancia a {freq} Hz: {abs(Z):.2f} Ohm (módulo)")         # Imprime el módulo de la impedancia
-print(f"SPL a {freq} Hz: {my_driver.spl_response(freq):.2f} dB")    # Imprime el SPL estimado
+print(f"SPL Total a {freq} Hz: {my_driver.spl_total(freq):.2f} dB") # Imprime el SPL total a esa frecuencia
+print(f"SPL 2pi a {freq} Hz: {my_driver.spl_2pi(freq):.2f} dB")     # Imprime el SPL 2pi a esa frecuencia
+print(f"Fase SPL a {freq} Hz: {my_driver.spl_phase(freq):.2f} °")   # Imprime la fase del SPL a esa frecuencia
 
 # --------------------------------------------
 # Barrido de frecuencias para simulación de rango completo
@@ -74,8 +76,10 @@ Z_values = np.array([my_driver.impedance(f) for f in frequencies])
 Z_magnitude = np.abs(Z_values)                                      # Módulo de la impedancia
 Z_phase = np.angle(Z_values, deg=True)                              # Fase de la impedancia en grados
 
-# Calcula la respuesta SPL estimada para cada frecuencia
-SPL_values = np.array([my_driver.spl_response(f) for f in frequencies])
+# Calcula la respuesta SPL estimada para cada frecuencia: total (directividad) + 2pi + fase acústica
+SPL_total = np.array([my_driver.spl_total(f) for f in frequencies])
+SPL_2pi = np.array([my_driver.spl_2pi(f) for f in frequencies])
+SPL_phase = np.array([my_driver.spl_phase(f) for f in frequencies])
 
 # Calcula la velocidad del cono para cada frecuencia (magnitud)
 velocities = np.array([abs(my_driver.velocity(f)) for f in frequencies])
@@ -95,47 +99,61 @@ excursion_ratio = excursions / my_driver.Xmax                       # Excursión
 
 fig, axs = plt.subplots(2, 2, figsize=(12, 10))
 
-# === 1. Impedancia (módulo y fase) ===
-axs[0, 0].set_title("Impedancia y Fase")
-
-ax1 = axs[0, 0]                                                     # Eje principal para la impedancia
-ln1 = ax1.semilogx(frequencies, Z_magnitude, 'b-', label="|Z| [Ohm]")
+# === 1. Impedancia y fase eléctrica
+axs[0, 0].set_title("Impedancia y Fase Eléctrica")
+ax1 = axs[0, 0]
+ln1 = ax1.semilogx(frequencies, Z_magnitude, 'b-', label="|Z| [Ohm]")[0]
 ax1.set_ylabel("Impedancia [Ohm]", color='b')
 ax1.tick_params(axis='y', labelcolor='b')
 
-ax2 = ax1.twinx()                                                   # Eje secundario para la fase
-ln2 = ax2.semilogx(frequencies, Z_phase, 'r-', label="∠Z [°]")
+ax2 = ax1.twinx()
+ln2 = ax2.semilogx(frequencies, Z_phase, 'r-', label="∠Z [°]")[0]
 ax2.set_ylabel("Fase [°]", color='r')
 ax2.tick_params(axis='y', labelcolor='r')
 
-lns = ln1 + ln2                                                     # Combina las líneas de ambos ejes
-labs = [l.get_label() for l in lns]
-ax1.legend(lns, labs, loc='best')
+lns1 = [ln1, ln2]
+labs1 = [l.get_label() for l in lns1]
+ax1.legend(lns1, labs1, loc='best')
 
-# === 2. SPL ===
-axs[0, 1].set_title("Respuesta SPL Estimada")
-ln3 = axs[0, 1].semilogx(frequencies, SPL_values, label="SPL [dB]")
-axs[0, 1].set_ylabel("SPL [dB]")
-axs[0, 1].legend()
+# === 2. SPL Total, SPL 2pi y Fase ===
+axs[0, 1].set_title("Respuesta SPL y Fase")
+
+ax_spl = axs[0, 1]
+ln3 = ax_spl.semilogx(frequencies, SPL_total, label="Total SPL Max (directividad)")[0]
+ln4 = ax_spl.semilogx(frequencies, SPL_2pi, '--', label="Total SPL 2pi")[0]
+ax_spl.set_ylabel("SPL [dB]", color='b')
+ax_spl.tick_params(axis='y', labelcolor='b')
+
+ax_phase = ax_spl.twinx()
+ln5 = ax_phase.semilogx(frequencies, SPL_phase, 'g-', label="Total Phase")[0]
+ax_phase.set_ylabel("Fase [°]", color='g')
+ax_phase.set_ylim(-180, 180)
+ax_phase.tick_params(axis='y', labelcolor='g')
+
+lns_spl_phase = [ln3, ln4, ln5]
+labs_spl_phase = [l.get_label() for l in lns_spl_phase]
+ax_spl.legend(lns_spl_phase, labs_spl_phase, loc='best')
 
 # === 3. Velocidad del cono ===
-axs[1, 0].set_title("Velocidad del Cono [m/s]")
-ln4 = axs[1, 0].semilogx(frequencies, velocities, label="Velocidad")
+axs[1, 0].set_title("Velocidad del Cono")
+ln6 = axs[1, 0].semilogx(frequencies, velocities, label="Velocidad [m/s]")[0]
+axs[1, 0].set_ylabel("Velocidad [m/s]")
+axs[1, 0].legend()
+axs[1, 0].set_xlabel("Frecuencia [Hz]")
 
-# === 4. Excursión pico y relación con Xmax ===
+# === 4. Excursión pico y ratio Xmax ===
 axs[1, 1].set_title("Excursión pico y relación con Xmax")
-ln5 = axs[1, 1].semilogx(frequencies, excursions_mm, label="Excursión [mm]")
-ln6 = axs[1, 1].semilogx(frequencies, excursion_ratio, "--", label="Excursión/Xmax")
-axs[1, 1].axhline(1, color="red", linestyle=":", label="Límite Xmax")
+ln7 = axs[1, 1].semilogx(frequencies, excursions_mm, label="Excursión [mm]")[0]
+ln8 = axs[1, 1].semilogx(frequencies, excursion_ratio, '--', label="Excursión/Xmax")[0]
+hline = axs[1, 1].axhline(1, color="red", linestyle=":", label="Límite Xmax")
 axs[1, 1].legend()
 
 # --------------------------------------------
-# Configuración de ticks y formato de ejes
+# Formato de ejes y ticks
 # --------------------------------------------
 
 custom_ticks = [10, 100, 1000, 10000, 15000, 20000]
-
-def fmt_ticks(x, pos):                                              # Formatea los ticks del eje x para mostrar en kHz si es mayor a 1000 Hz.
+def fmt_ticks(x, pos):
     if x >= 1000:
         return f"{x/1000:.0f}k"
     else:
@@ -150,24 +168,26 @@ for ax in axs.flat:
     ax.grid(True, which="both")
     ax.set_xlabel("Frecuencia [Hz]")
 
-ax2.set_xlim([10, 20000])                                           # Configura el eje x del segundo eje (fase)
+ax2.set_xlim([10, 20000])
 ax2.xaxis.set_major_locator(FixedLocator(custom_ticks))
 ax2.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
 ax2.xaxis.set_major_formatter(ticker.FuncFormatter(fmt_ticks))
 
-def cursor_fmt(sel):                                                # Formatea el texto del cursor interactivo
+# --------------------------------------------
+# Cursores
+# --------------------------------------------
+
+def cursor_fmt(sel):
     x = sel.target[0]
     y = sel.target[1]
-
     if x >= 1000:
         x_label = f"{x/1000:.1f}k"
     else:
         x_label = f"{x:.0f}"
-
-    label = sel.artist.get_label()                                  # Detecta la curva y asigna unidad Y
+    label = sel.artist.get_label()
     if "|Z|" in label:
         y_unit = "Ω"
-    elif "∠Z" in label:
+    elif "∠Z" in label or "Phase" in label:
         y_unit = "°"
     elif "SPL" in label:
         y_unit = "dB"
@@ -179,14 +199,15 @@ def cursor_fmt(sel):                                                # Formatea e
         y_unit = "mm"
     else:
         y_unit = ""
-
     sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
 
-cursor = mplcursors.cursor(lns + ln3 + ln4 + ln5 + ln6, hover=True) # Añade cursores interactivos a las líneas
+all_lines = lns1 + lns_spl_phase + [ln6, ln7, ln8, hline]           # Lista final de líneas (todas Line2D)
+
+cursor = mplcursors.cursor(all_lines, hover=True)
 cursor.connect("add", cursor_fmt)
 
-plt.tight_layout()                                                  # Ajusta el layout para evitar solapamientos
-plt.show()                                                          # Muestra la gráfica en una ventana interactiva
+plt.tight_layout()
+plt.show()
 
 #====================================================================================================================================
 #====================================================================================================================================

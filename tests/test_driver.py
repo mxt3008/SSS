@@ -31,13 +31,45 @@ def test_impedance_is_complex():
     assert Z.real > 0, "Parte real de la impedancia debe ser positiva"
 
 # ------------------------
-# Test: El SPL debe ser un número realista y dentro de un rango físico razonable
+# Test: SPL 2pi debe ser realista
 # ------------------------
-def test_spl_response_valid():
+def test_spl_2pi_valid():
     driver = Driver(params)
-    spl = driver.spl_response(100)
-    assert isinstance(spl, (float, int)), "SPL debe ser un número"
-    assert 70 < spl < 120, f"SPL parece irreal: {spl} dB"
+    spl = driver.spl_2pi(100, U=2.83)
+    assert isinstance(spl, (float, int))
+    assert 70 < spl < 120, f"SPL 2pi irreal: {spl} dB"
+
+# ------------------------
+# Test: SPL total (con directividad) debe ser similar a SPL 2pi en baja frecuencia,
+# y menor a altas frecuencias debido a la directividad.
+# ------------------------
+def test_spl_total_directivity_effect():
+    driver = Driver(params)
+    spl_low = driver.spl_total(100, U=2.83)
+    spl_high = driver.spl_total(5000, U=2.83)
+    spl_ref = driver.spl_2pi(100, U=2.83)
+    assert abs(spl_low - spl_ref) < 1, "SPL total debe coincidir con SPL 2pi a bajas frecuencias"
+    assert spl_high < spl_low, "SPL total debe ser menor en alta frecuencia por directividad"
+
+# ------------------------
+# Test: Fase debe ser un número real en [-180°, 180°]
+# ------------------------
+def test_spl_phase_range():
+    driver = Driver(params)
+    phase = driver.spl_phase(100, U=2.83)
+    assert isinstance(phase, (float, int))
+    assert -180 <= phase <= 180, f"Fase fuera de rango: {phase} grados"
+
+# ------------------------
+# Test: SPL total vs SPL 2pi - coherencia de directividad a bajas frecuencias
+# ------------------------
+def test_spl_total_directivity_effect():
+    driver = Driver(params)
+    f_low = 5  # Hz, bien baja frecuencia
+    spl_total = driver.spl_total(f_low)
+    spl_2pi = driver.spl_2pi(f_low)
+    diff = abs(spl_total - spl_2pi)
+    assert diff < 1.0, f"SPL total debe coincidir con SPL 2pi a bajas frecuencias, diff={diff:.3f} dB"
 
 # ------------------------
 # Test: Los parámetros derivados deben ser positivos
