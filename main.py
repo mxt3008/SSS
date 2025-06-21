@@ -77,9 +77,9 @@ Z_magnitude = np.abs(Z_values)                                      # Módulo de
 Z_phase = np.angle(Z_values, deg=True)                              # Fase de la impedancia en grados
 
 # Calcula la respuesta SPL estimada para cada frecuencia: total (directividad) + 2pi + fase acústica
-SPL_total = np.array([my_driver.spl_total(f) for f in frequencies])
-SPL_2pi = np.array([my_driver.spl_2pi(f) for f in frequencies])
-SPL_phase = np.array([my_driver.spl_phase(f) for f in frequencies])
+SPL_total = np.array([my_driver.spl_total(f) for f in frequencies]) # SPL total (realista, con directividad)
+SPL_2pi = np.array([my_driver.spl_2pi(f) for f in frequencies])     # SPL 2pi (ideal, sin directividad)
+SPL_phase = np.array([my_driver.spl_phase(f) for f in frequencies]) # Fase del SPL (acústica)
 
 # Calcula la velocidad del cono para cada frecuencia (magnitud)
 velocities = np.array([abs(my_driver.velocity(f)) for f in frequencies])
