@@ -41,18 +41,25 @@ params = {
     "Le": 0.0005                                # Inductancia de la bobina [Henrios]
 }
 
+#  --------------------------------------------
+# Menú interactivo - Se introducen parámetros TS (Enter para usar los valores por defecto)
+#  --------------------------------------------
+
+print("\n=== Simulador de Driver ===")
+print("Introduce parámetros TS del altavoz (Enter = usa valores por defecto)\n")
+
+for key, default in params.items():
+    val = input(f"{key} [{default}]: ")         # Solicita al usuario el valor del parámetro
+    if val.strip() == "":
+        params[key] = default                   # Si el usuario deja vacío, usa valor por defecto
+    else:
+        try:
+            params[key] = float(val)            # Convierte a float el valor ingresado
+        except ValueError:
+            print(f"⚠️ Valor inválido para {key}. Se usará valor por defecto: {default}")
+            params[key] = default
+
 my_driver = Driver(params)                      # Crea una instancia del driver con los parámetros definidos
-
-# # --------------------------------------------
-# # Mostrar parámetros derivados en consola
-# # --------------------------------------------
-
-# print(f"Mms: {my_driver.Mms:.4f} kg")                               # Masa móvil del diafragma
-# print(f"Cms: {my_driver.Cms:.6f} m/N")                              # Complianza mecánica
-# print(f"Rms: {my_driver.Rms:.4f} kg/s")                             # Resistencia mecánica
-# print(f"Qms: {my_driver.Qms():.4f}")                                # Factor de calidad mecánico
-# print(f"Kms: {my_driver.Kms:.4f} N/m")                              # Rigidez mecánica
-# print("============================\n")                             # Separador visual
 
 # --------------------------------------------
 # Calcular y mostrar impedancia y SPL para una frecuencia específica

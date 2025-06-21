@@ -53,23 +53,26 @@ class Driver:
         self.R = 287.05                                 # Constante de gas ideal para aire seco [J/(kg·K)] (287.05 J/(kg·K))
         if self.R <= 0:
             raise ValueError("La constante de gas R debe ser mayor que 0 J/(kg·K).")
-
-        # Densidad y velocidad del sonido ajustadas a T0
-        self.rho0 = self.P0 / (self.R * self.T0)
-        self.c = np.sqrt(self.gamma * self.R * self.T0)
+        
+        self.rho0 = self.P0 / (self.R * self.T0)        # Densidad del aire a presión P0 y temperatura T0 [kg/m³]
+        self.c = np.sqrt(self.gamma * self.R * self.T0) # Velocidad del sonido a presión P0 y temperatura T0 [m/s]
 
         # -------------------------------
         # Cálculo de parámetros derivados
         # ------------------------------
 
-        self.resolve_Mms_Cms_Fs()
+        self.resolve_Mms_Cms_Fs()                       # Resuelve Mms, Cms y Fs según los parámetros disponibles
 
-        # Derivar Kms y Rms
-        self.Kms = 1 / self.Cms
-        self.Rms = self.derive_Rms()
+        self.Kms = 1 / self.Cms                         # Deriva Kms a partir de Cms
+        if self.Kms <= 0:                               # Verifica que Kms sea positivo
+            raise ValueError("Kms debe ser mayor que cero.")    
+        self.Rms = self.derive_Rms()                    # Deriva Rms a partir de Mms, Fs y Qms
+        if self.Rms <= 0:                               # Verifica que Rms sea positivo
+            raise ValueError("Rms debe ser mayor que cero.")
 
-        # Derivar Vas realista usando Cms y condiciones reales
-        self.Vas = self.derive_Vas()
+        self.Vas = self.derive_Vas()                    # Derivar Vas realista usando Cms y condiciones reales
+        if self.Vas <= 0:                               # Verifica que Vas sea positivo
+            raise ValueError("Vas debe ser mayor que cero.")
 
 #====================================================================================================================================
 #====================================================================================================================================
