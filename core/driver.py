@@ -36,6 +36,8 @@ class Driver:
             raise ValueError("El área Sd debe ser mayor que cero para convertir Cms a Vas.")       
         self.Xmax = params.get("Xmax", 0.005)           # Excursión máxima lineal, en m
 
+        self.Rg = params.get("Rg", 0.5)                 # Resistencia de la fuente de voltaje, en Ohm (opcional)
+
         # -------------------------------
         # Condiciones ambientales y físicas
         # -------------------------------
@@ -174,9 +176,9 @@ class Driver:
 #====================================================================================================================================
 
     def impedance(self, f):                                             # Impedancia del driver a una frecuencia f
-        w = 2 * np.pi * f                                               # Frecuencia angular
+        w = 2 * np.pi * f                                               # Frecuencia angular 
         Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)               # Impedancia mecánica del driver
-        Ze = self.Re + 1j*w*self.Le + (self.Bl**2) / Zm                 # Impedancia eléctrica del driver
+        Ze = self.Re + self.Rg + 1j*w*self.Le + (self.Bl**2) / Zm       # Impedancia eléctrica del driver
         return Ze
     
 #====================================================================================================================================
