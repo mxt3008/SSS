@@ -121,7 +121,7 @@ excursion_ratio = excursions / my_driver.Xmax                       # Excursión
 # Gráfica 3x3 para visualizar todos los parámetros
 # --------------------------------------------
 
-fig, axs = plt.subplots(3, 3, figsize=(18, 14))
+fig, axs = plt.subplots(3, 3, figsize=(14, 10))
 axs = axs.flatten()                                                 # Aplana la matriz 3x3 a un arreglo 1D de 9 elementos
 fig.suptitle("Análisis del Comportamiento de un Parlante en Aire Libre", fontsize=12, fontweight='bold')
 
@@ -139,6 +139,7 @@ ax2.tick_params(axis='y', labelcolor='r')
 lns1 = [ln1, ln2]
 labs1 = [l.get_label() for l in lns1]
 ax1.legend(lns1, labs1, loc='best')
+axs[0].set_xlabel("Frecuencia [Hz]")
 
 # === 2. SPL y Fase ===
 
@@ -155,6 +156,7 @@ ax_phase.tick_params(axis='y', labelcolor='g')
 lns_spl_phase = [ln3, ln4]
 labs_spl_phase = [l.get_label() for l in lns_spl_phase]
 ax_spl.legend(lns_spl_phase, labs_spl_phase, loc='best')
+axs[1].set_xlabel("Frecuencia [Hz]")
 
 # === 3. Desplazamiento de la bobina ===
 
@@ -175,9 +177,22 @@ axs[3].set_xlabel("Frecuencia [Hz]")
 # === 5. Potencia acústica ===
 axs[4].set_title("Potencia Acústica")
 
+axs[4].set_xlabel("Frecuencia [Hz]")
+
 # === 6. Retardo de grupo ===
+axs[5].set_title("Retardo de Grupo")
+
+axs[5].set_xlabel("Frecuencia [Hz]")
+
 # === 7. Respuesta al escalón ===
+axs[6].set_title("Respuesta al Escalón")
+
+axs[6].set_xlabel("Frecuencia [Hz]")
+
 # === 8. Eficiencia ===
+axs[7].set_title("Eficiencia")
+
+axs[7].set_xlabel("Frecuencia [Hz]")
 
 # === 9. Excursión pico y relación con Xmax ===
 
