@@ -45,10 +45,12 @@ params = {
 
 #  --------------------------------------------
 # Menú interactivo - Se introducen parámetros TS (Enter para usar los valores por defecto)
-#  --------------------------------------------
 
-print("\n=== Simulador de Driver ===")
-print("Introduce parámetros TS del altavoz (Enter = usa valores por defecto)\n")
+#  --------------------------------------------
+print("\n=====================================================================")
+print("=== Simulador de Driver ===")
+print("=== Parámetros por defecto utilizados - JBL 2206H ===")
+print("\nIntroduce parámetros TS del altavoz (Enter = usa valores por defecto)\n")
 
 for key, default in params.items():
     val = input(f"{key} [{default}]: ")         # Solicita al usuario el valor del parámetro
@@ -67,11 +69,14 @@ my_driver = Driver(params)                      # Crea una instancia del driver 
 # Calcular y mostrar impedancia y SPL para una frecuencia específica
 # --------------------------------------------
 
-freq = params["Fs"]                                                 # Usar la frecuencia de resonancia para la prueba puntual
-Z = my_driver.impedance(freq)                                       # Calcula la impedancia compleja a esa frecuencia
-print(f"Impedancia a {freq} Hz: {abs(Z):.2f} Ohm (módulo)")         # Imprime el módulo de la impedancia
-print(f"SPL Total a {freq} Hz: {my_driver.spl_total(freq):.2f} dB") # Imprime el SPL total a esa frecuencia
-print(f"Fase SPL a {freq} Hz: {my_driver.spl_phase(freq):.2f} °")   # Imprime la fase del SPL a esa frecuencia
+freq = params["Fs"]                                                         # Usar la frecuencia de resonancia para la prueba puntual
+Z = my_driver.impedance(freq)                                               # Calcula la impedancia compleja a esa frecuencia
+print("=====================================================================")
+print(f"Impedancia (módulo) a {freq} Hz: {abs(Z):.2f}")                     # Imprime el módulo de la impedancia
+print(f"Impedancia (fase) a {freq} Hz: {np.angle(Z, deg=True):.2f} °")      # Imprime la fase de la impedancia
+print(f"SPL (módulo) a {freq} Hz: {my_driver.spl_total(freq):.2f} dB")      # Imprime el SPL total a esa frecuencia
+print(f"SPL (fase) a {freq} Hz: {my_driver.spl_phase(freq):.2f} °")         # Imprime la fase del SPL a esa frecuencia
+print("=====================================================================")
 
 # --------------------------------------------
 # Barrido de frecuencias para simulación de rango completo
@@ -80,20 +85,30 @@ print(f"Fase SPL a {freq} Hz: {my_driver.spl_phase(freq):.2f} °")   # Imprime l
 f_max = my_driver.f_max_ka()                                        # Obtiene la frecuencia máxima del altavoz (frecuencia de corte)
 frequencies = np.logspace(np.log10(5), np.log10(f_max), 1000)       # Vector de frecuencias de 5 Hz a 1000 Hz (escala logarítmica)
 print(f"Frecuencia máxima para ka ≤ 1: {f_max:.2f} Hz")             # Imprime la frecuencia máxima para ka ≤ 1
+print("=====================================================================\n")
 
-# Calcula la impedancia compleja para cada frecuencia
+# 1. Calcula la impedancia compleja para cada frecuencia
 Z_values = np.array([my_driver.impedance(f) for f in frequencies])
 Z_magnitude = np.abs(Z_values)                                      # Módulo de la impedancia
 Z_phase = np.angle(Z_values, deg=True)                              # Fase de la impedancia en grados
 
-# Calcula la respuesta SPL estimada para cada frecuencia: total (directividad) + 2pi + fase acústica
-SPL_total = np.array([my_driver.spl_total(f) for f in frequencies]) # SPL total (realista, con directividad)
+# 2. Calcula la respuesta SPL estimada para cada frecuencia: total + fase acústica
+SPL_total = np.array([my_driver.spl_total(f) for f in frequencies]) # SPL total
 SPL_phase = np.array([my_driver.spl_phase(f) for f in frequencies]) # Fase del SPL (acústica)
 
-# Calcula la velocidad del cono para cada frecuencia (magnitud)
+# 3, Calcula el desplazamiento del cono para cada frecuencia
+displacements = np.array([my_driver.displacement(f) for f in frequencies])
+displacements_mm = displacements * 1000                             # Convertir a milímetros para graficar
+
+# 4. Calcula la velocidad del cono para cada frecuencia (magnitud)
 velocities = np.array([abs(my_driver.velocity(f)) for f in frequencies])
 
-# Calcula la excursión pico del cono para cada frecuencia
+# 5. Calcula la potencia acústica para cada frecuencia - Real, aparente y la corriente
+# 6. Calcula el retardo de grupo para cada frecuencia
+# 7. Calcula la respuesta al escalón para cada frecuencia
+# 8. Calcula la eficiencia del altavoz para cada frecuencia
+
+# 9. Calcula la excursión pico del cono para cada frecuencia
 excursions = velocities / (2 * np.pi * frequencies)                 # Excursión en metros
 excursions_mm = excursions * 1000                                   # Excursión en milímetros
 excursion_ratio = excursions / my_driver.Xmax                       # Excursión normalizada respecto a Xmax
@@ -103,63 +118,75 @@ excursion_ratio = excursions / my_driver.Xmax                       # Excursión
 #====================================================================================================================================
 
 # --------------------------------------------
-# Gráfica 2x2 para visualizar todos los parámetros
+# Gráfica 3x3 para visualizar todos los parámetros
 # --------------------------------------------
 
-fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+fig, axs = plt.subplots(3, 3, figsize=(18, 14))
+axs = axs.flatten()                                                 # Aplana la matriz 3x3 a un arreglo 1D de 9 elementos
+fig.suptitle("Análisis del Comportamiento de un Parlante en Aire Libre", fontsize=12, fontweight='bold')
 
 # === 1. Impedancia y Fase ===
 
-axs[0, 0].set_title("Impedancia y Fase Eléctrica")
-ax1 = axs[0, 0]
+axs[0].set_title("Impedancia y Fase Eléctrica")
+ax1 = axs[0]
 ln1 = ax1.semilogx(frequencies, Z_magnitude, 'b-', label="|Z| [Ohm]")[0]
 ax1.set_ylabel("Impedancia [Ohm]", color='b')
 ax1.tick_params(axis='y', labelcolor='b')
-
 ax2 = ax1.twinx()
 ln2 = ax2.semilogx(frequencies, Z_phase, 'r-', label="∠Z [°]")[0]
 ax2.set_ylabel("Fase [°]", color='r')
 ax2.tick_params(axis='y', labelcolor='r')
-
 lns1 = [ln1, ln2]
 labs1 = [l.get_label() for l in lns1]
 ax1.legend(lns1, labs1, loc='best')
 
-# === 2. SPL Total, SPL 2π y Fase ===
+# === 2. SPL y Fase ===
 
-axs[0, 1].set_title("Respuesta SPL y Fase")
-
-ax_spl = axs[0, 1]
-ln3 = ax_spl.semilogx(frequencies, SPL_total, label="SPL Total")[0]  #Principal
+axs[1].set_title("Respuesta SPL y Fase")
+ax_spl = axs[1]
+ln3 = ax_spl.semilogx(frequencies, SPL_total, label="SPL Total")[0]
 ax_spl.set_ylabel("SPL [dB]", color='b')
 ax_spl.tick_params(axis='y', labelcolor='b')
-
 ax_phase = ax_spl.twinx()
 ln4 = ax_phase.semilogx(frequencies, SPL_phase, 'g-', label="Fase SPL [°]")[0]
 ax_phase.set_ylabel("Fase [°]", color='g')
 ax_phase.set_ylim(-180, 180)
 ax_phase.tick_params(axis='y', labelcolor='g')
-
 lns_spl_phase = [ln3, ln4]
 labs_spl_phase = [l.get_label() for l in lns_spl_phase]
 ax_spl.legend(lns_spl_phase, labs_spl_phase, loc='best')
 
-# === 3. Velocidad del cono ===
+# === 3. Desplazamiento de la bobina ===
 
-axs[1, 0].set_title("Velocidad del Cono")
-ln6 = axs[1, 0].semilogx(frequencies, velocities, label="Velocidad [m/s]")[0]
-axs[1, 0].set_ylabel("Velocidad [m/s]")
-axs[1, 0].legend()
-axs[1, 0].set_xlabel("Frecuencia [Hz]")
+axs[2].set_title("Desplazamiento de la Bobina")
+ln_disp = axs[2].semilogx(frequencies, displacements_mm, label="Desplazamiento [mm]")[0]
+axs[2].set_ylabel("Desplazamiento [mm]")
+axs[2].legend()
+axs[2].set_xlabel("Frecuencia [Hz]")
 
-# === 4. Excursión pico y relación con Xmax ===
+# === 4. Velocidad del cono ===
 
-axs[1, 1].set_title("Excursión pico y Relación con Xmax")
-ln7 = axs[1, 1].semilogx(frequencies, excursions_mm, label="Excursión [mm]")[0]
-ln8 = axs[1, 1].semilogx(frequencies, excursion_ratio, '--', label="Excursión/Xmax")[0]
-hline = axs[1, 1].axhline(1, color="red", linestyle=":", label="Límite Xmax")
-axs[1, 1].legend()
-axs[1, 1].set_xlabel("Frecuencia [Hz]")
+axs[3].set_title("Velocidad del Cono")
+ln6 = axs[3].semilogx(frequencies, velocities, label="Velocidad [m/s]")[0]
+axs[3].set_ylabel("Velocidad [m/s]")
+axs[3].legend()
+axs[3].set_xlabel("Frecuencia [Hz]")
+
+# === 5. Potencia acústica ===
+axs[4].set_title("Potencia Acústica")
+
+# === 6. Retardo de grupo ===
+# === 7. Respuesta al escalón ===
+# === 8. Eficiencia ===
+
+# === 9. Excursión pico y relación con Xmax ===
+
+axs[8].set_title("Excursión pico y Relación con Xmax")
+ln7 = axs[8].semilogx(frequencies, excursions_mm, label="Excursión [mm]")[0]
+ln8 = axs[8].semilogx(frequencies, excursion_ratio, '--', label="Excursión/Xmax")[0]
+hline = axs[8].axhline(1, color="red", linestyle=":", label="Límite Xmax")
+axs[8].legend()
+axs[8].set_xlabel("Frecuencia [Hz]")
 
 # --------------------------------------------
 # Ajustes de ejes y formato logarítmico

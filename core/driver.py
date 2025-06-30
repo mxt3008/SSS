@@ -199,6 +199,16 @@ class Driver:
     
 #====================================================================================================================================
 
+    def displacement(self, f):                                          # Desplazamiento del diafragma a una frecuencia f
+        if f <= 0:                                                      # Verifica que la frecuencia sea mayor que cero
+            raise ValueError("La frecuencia debe ser mayor que cero para calcular el desplazamiento.")
+        
+        v = np.abs(self.velocity(f))                                    # Magnitud de la velocidad [m/s]
+        x = v / (2 * np.pi * f)                                         # Desplazamiento en metros
+        return x
+
+#====================================================================================================================================
+
     def velocity(self, f):                                              # Velocidad del diafragma a una frecuencia f
         w = 2 * np.pi * f                                               # Frecuencia angular
         Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)               # Impedancia mecánica del driver
