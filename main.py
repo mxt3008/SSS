@@ -234,7 +234,7 @@ def cursor_fmt(sel):                                                        # Fo
         y_unit = ""
     sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
 
-all_lines = lns1 + lns_spl_phase + [ln6, ln7, ln8, hline]
+all_lines = lns1 + lns_spl_phase + [ln_disp, ln6, ln7, ln8, hline]
 cursor = mplcursors.cursor(all_lines, hover=True)
 cursor.connect("add", cursor_fmt)
 

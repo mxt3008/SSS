@@ -184,6 +184,9 @@ class Driver:
         return 1 / self.Cms                                             # Kms = 1 / Cms, donde Cms es la compliancia mecánica del driver
     
 #====================================================================================================================================
+    # ===============================
+    # 1. Impedancia del driver - Magnitud y Fase
+    # ===============================
 
     def impedance(self, f):                                             # Impedancia del driver a una frecuencia f
         w = 2 * np.pi * f                                               # Frecuencia angular 
@@ -198,25 +201,8 @@ class Driver:
         return Ze
     
 #====================================================================================================================================
-
-    def displacement(self, f):                                          # Desplazamiento del diafragma a una frecuencia f
-        if f <= 0:                                                      # Verifica que la frecuencia sea mayor que cero
-            raise ValueError("La frecuencia debe ser mayor que cero para calcular el desplazamiento.")
-        
-        v = np.abs(self.velocity(f))                                    # Magnitud de la velocidad [m/s]
-        x = v / (2 * np.pi * f)                                         # Desplazamiento en metros
-        return x
-
-#====================================================================================================================================
-
-    def velocity(self, f):                                              # Velocidad del diafragma a una frecuencia f
-        w = 2 * np.pi * f                                               # Frecuencia angular
-        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)               # Impedancia mecánica del driver
-        return self.Bl / Zm                                             # Velocidad del diafragma, V = Bl / Zm
-    
-#====================================================================================================================================
     # ===============================
-    # SPL TOTAL con directividad real. 
+    # 2. SPL - Magnitud y Fase 
     # ===============================
 
     def spl_total(self, f, U=2.83):
@@ -229,7 +215,7 @@ class Driver:
         if np.abs(I) == 0:                                              # Evita división por cero
             raise ValueError("La corriente I es cero, no se puede calcular SPL.")
         
-        v = I * self.velocity(f)                                        # Velocidad promedio del pistón a la frecuencia f
+        v = self.velocity(f,U)                                          # Velocidad promedio del pistón a la frecuencia f
         if np.abs(v) == 0:                                              # Evita división por cero
             raise ValueError("La velocidad v es cero, no se puede calcular SPL.")
 
@@ -261,10 +247,6 @@ class Driver:
 
         return SPL
 
-    # ===============================
-    # FASE del SPL TOTAL
-    # ===============================
-
     def spl_phase(self, f, U=2.83):
 
         Z = self.impedance(f)                                           # Impedancia eléctrica del driver a la frecuencia f
@@ -275,7 +257,7 @@ class Driver:
         if np.abs(I) == 0:                                              # Evita división por cero
             raise ValueError("La corriente I es cero, no se puede calcular SPL.")
         
-        v = self.velocity(f) * I                                        # Velocidad promedio del pistón a la frecuencia f
+        v = self.velocity(f, U)                                         # Velocidad promedio del pistón a la frecuencia f
         if np.abs(v) == 0:                                              # Evita división por cero
             raise ValueError("La velocidad v es cero, no se puede calcular SPL.")
 
@@ -306,8 +288,70 @@ class Driver:
         return phase_deg
 
 #====================================================================================================================================
+    # ===============================
+    # 3. Desplazamiento de la bobina
+    # ===============================
 
+    def displacement(self, f, U=2.83):
+        if f <= 0:
+            raise ValueError("La frecuencia debe ser mayor que cero para calcular el desplazamiento.")
+
+        v = self.velocity(f, U)                    # Velocidad compleja
+        w = 2 * np.pi * f                          # Frecuencia angular
+
+        x = np.abs(v) / w                          # Magnitud del desplazamiento [m]
+        return x
+
+#====================================================================================================================================
+    # ===============================
+    # 4. Velocidad del diafragma
+    # ===============================
+
+    def velocity(self, f, U=2.83):
+        if f <= 0:
+            raise ValueError("La frecuencia debe ser mayor que cero para calcular la velocidad.")
+
+        Z = self.impedance(f)                      # Impedancia total eléctrica del driver
+        if np.abs(Z) == 0:
+            raise ValueError("La impedancia Z es cero, no se puede calcular la velocidad.")
+
+        I = U / Z                                  # Corriente inducida en la bobina
+        w = 2 * np.pi * f                          # Frecuencia angular
+
+        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)  # Impedancia mecánica del driver
+
+        v = I * (self.Bl / Zm)                     # Velocidad real del diafragma [m/s]
+
+        return v
+    
+#====================================================================================================================================
+
+#====================================================================================================================================
+    # ===============================
+    # 5. Potencia acústica - Real y Reactiva
+    # ===============================
+
+#====================================================================================================================================
+    # ===============================
+    # 6. Retardo de grupo
+    # ===============================
+
+#====================================================================================================================================
+    # ===============================
+    # 7. Respuesta al escalón
+    # ===============================
+    
+#====================================================================================================================================
+    # ===============================
+    # 8. Eficiencia del driver
+    # ===============================
+    
     def efficiency(self):                                               # Deriva la eficiencia del driver
         w0 = 2 * np.pi * self.Fs
         eta0 = (self.Bl ** 2) / (self.Re * self.rho0 * self.c ** 3 * self.Sd)
         return eta0
+    
+#====================================================================================================================================
+    # ===============================
+    # 9. Excursión máxima
+    # ===============================
