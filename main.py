@@ -222,6 +222,8 @@ def cursor_fmt(sel):                                                        # Fo
         y_unit = "Ω"
     elif "SPL" in label:
         y_unit = "dB"
+    elif "Desplazamiento" in label:
+        y_unit = "mm"
     elif "Velocidad" in label:
         y_unit = "m/s"
     elif "Excursión/Xmax" in label:
