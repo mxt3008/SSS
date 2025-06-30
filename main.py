@@ -30,15 +30,17 @@ from core.driver import Driver                                              # Im
 # --------------------------------------------
 
 params = {
-    "Fs": 40,                                   # Frecuencia de resonancia [Hz]
-    "Mms": 0.025,                               # Masa móvil aproximada [kg]
-    "Vas": 50,                                  # Volumen de aire equivalente [litros]
-    "Qts": 0.35,                                # Factor de calidad total
-    "Qes": 0.4,                                 # Factor de calidad eléctrico
-    "Re": 6.0,                                  # Resistencia DC de la bobina [Ohm]
-    "Bl": 7.5,                                  # Producto flujo-Bobina [N/A]
-    "Sd": 0.02,                                 # Área efectiva del diafragma [m²]
-    "Le": 0.0005                                # Inductancia de la bobina [Henrios]
+    "Fs": 52,                                   # Frecuencia de resonancia [Hz]
+    "Mms": 0.065,                               # Masa móvil aproximada [kg]
+    "Vas": 62,                                  # Volumen de aire equivalente [litros]
+    "Qts": 0.32,                                # Factor de calidad total
+    "Qes": 0.34,                                # Factor de calidad eléctrico
+    "Qms": 4.5,                                 # Factor de calidad mecánico 
+    "Re": 5.3,                                  # Resistencia DC de la bobina [Ohm]
+    "Bl": 18.1,                                 # Producto flujo-Bobina [N/A]
+    "Sd": 0.055,                                # Área efectiva del diafragma [m²]
+    "Le": 1.5e-3,                               # Inductancia de la bobina [Henrios]
+    "Xmax": 7.5                                 # Excursión máxima lineal del cono [milímetros]
 }
 
 #  --------------------------------------------
@@ -69,14 +71,15 @@ freq = params["Fs"]                                                 # Usar la fr
 Z = my_driver.impedance(freq)                                       # Calcula la impedancia compleja a esa frecuencia
 print(f"Impedancia a {freq} Hz: {abs(Z):.2f} Ohm (módulo)")         # Imprime el módulo de la impedancia
 print(f"SPL Total a {freq} Hz: {my_driver.spl_total(freq):.2f} dB") # Imprime el SPL total a esa frecuencia
-print(f"SPL 2pi a {freq} Hz: {my_driver.spl_2pi(freq):.2f} dB")     # Imprime el SPL 2pi a esa frecuencia
 print(f"Fase SPL a {freq} Hz: {my_driver.spl_phase(freq):.2f} °")   # Imprime la fase del SPL a esa frecuencia
 
 # --------------------------------------------
 # Barrido de frecuencias para simulación de rango completo
 # --------------------------------------------
 
-frequencies = np.logspace(np.log10(5), np.log10(20000), 2000)       # Vector de frecuencias de 5 Hz a 1000 Hz (escala logarítmica)
+f_max = my_driver.f_max_ka()                                        # Obtiene la frecuencia máxima del altavoz (frecuencia de corte)
+frequencies = np.logspace(np.log10(5), np.log10(f_max), 1000)       # Vector de frecuencias de 5 Hz a 1000 Hz (escala logarítmica)
+print(f"Frecuencia máxima para ka ≤ 1: {f_max:.2f} Hz")             # Imprime la frecuencia máxima para ka ≤ 1
 
 # Calcula la impedancia compleja para cada frecuencia
 Z_values = np.array([my_driver.impedance(f) for f in frequencies])
@@ -85,7 +88,6 @@ Z_phase = np.angle(Z_values, deg=True)                              # Fase de la
 
 # Calcula la respuesta SPL estimada para cada frecuencia: total (directividad) + 2pi + fase acústica
 SPL_total = np.array([my_driver.spl_total(f) for f in frequencies]) # SPL total (realista, con directividad)
-SPL_2pi = np.array([my_driver.spl_2pi(f) for f in frequencies])     # SPL 2pi (ideal, sin directividad)
 SPL_phase = np.array([my_driver.spl_phase(f) for f in frequencies]) # Fase del SPL (acústica)
 
 # Calcula la velocidad del cono para cada frecuencia (magnitud)
@@ -128,18 +130,17 @@ ax1.legend(lns1, labs1, loc='best')
 axs[0, 1].set_title("Respuesta SPL y Fase")
 
 ax_spl = axs[0, 1]
-ln3 = ax_spl.semilogx(frequencies, SPL_total, label="SPL Total (realista)")[0]  # ✅ Principal
-ln4 = ax_spl.semilogx(frequencies, SPL_2pi, '--', label="SPL 2π (ideal)")[0]    # ✅ Opcional
+ln3 = ax_spl.semilogx(frequencies, SPL_total, label="SPL Total")[0]  #Principal
 ax_spl.set_ylabel("SPL [dB]", color='b')
 ax_spl.tick_params(axis='y', labelcolor='b')
 
 ax_phase = ax_spl.twinx()
-ln5 = ax_phase.semilogx(frequencies, SPL_phase, 'g-', label="Fase SPL [°]")[0]
+ln4 = ax_phase.semilogx(frequencies, SPL_phase, 'g-', label="Fase SPL [°]")[0]
 ax_phase.set_ylabel("Fase [°]", color='g')
 ax_phase.set_ylim(-180, 180)
 ax_phase.tick_params(axis='y', labelcolor='g')
 
-lns_spl_phase = [ln3, ln4, ln5]
+lns_spl_phase = [ln3, ln4]
 labs_spl_phase = [l.get_label() for l in lns_spl_phase]
 ax_spl.legend(lns_spl_phase, labs_spl_phase, loc='best')
 
@@ -166,12 +167,14 @@ axs[1, 1].set_xlabel("Frecuencia [Hz]")
 
 custom_ticks = [10, 100, 1000, 10000, 15000, 20000]
 
-def fmt_ticks(x, pos):
-    return f"{x/1000:.0f}k" if x >= 1000 else f"{x:.0f}"
+def fmt_ticks(x, pos):                                                      # Formatea los ticks del eje x
+    if x == 0:
+        return "0"  
+    return f"{x/1000:.0f}k" if x >= 1000 else f"{x:.0f}"                    # Formatea a kHz si es mayor o igual a 1000
 
 for ax in axs.flat:
     ax.set_xscale('log')
-    ax.set_xlim([10, 20000])
+    ax.set_xlim([10, (f_max*1.1)])                                          # Ajusta el límite derecho para incluir un margen
     ax.xaxis.set_major_locator(FixedLocator(custom_ticks))
     ax.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
     ax.xaxis.set_major_formatter(ticker.FuncFormatter(fmt_ticks))
@@ -181,15 +184,15 @@ for ax in axs.flat:
 # Cursores interactivos para inspeccionar valores
 # --------------------------------------------
 
-def cursor_fmt(sel):
+def cursor_fmt(sel):                                                        # Formatea la anotación del cursor
     x = sel.target[0]
     y = sel.target[1]
-    x_label = f"{x/1000:.1f}k" if x >= 1000 else f"{x:.0f}"
+    x_label = f"{x/1000:.1f}k" if x >= 1000 else f"{x:.0f}"                 # Formatea la frecuencia a kHz si es mayor o igual a 1000
     label = sel.artist.get_label()
-    if "|Z|" in label:
-        y_unit = "Ω"
-    elif "∠Z" in label or "Phase" in label:
+    if "∠Z" in label or "Phase" in label or "Fase" in label:
         y_unit = "°"
+    elif "|Z|" in label:
+        y_unit = "Ω"
     elif "SPL" in label:
         y_unit = "dB"
     elif "Velocidad" in label:
