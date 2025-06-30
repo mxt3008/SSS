@@ -226,6 +226,28 @@ for ax in axs.flat:
 # Cursores interactivos para inspeccionar valores
 # --------------------------------------------
 
+# Crear lista de ejes secundarios 
+extra_axes = [ax2, ax_phase]  # eje para fase de impedancia y fase de SPL
+
+# Guardamos pares (eje, línea_horizontal, línea_vertical)
+interactive_axes = []
+
+# Agrega los 9 subplots originales
+for ax in axs:
+    v = ax.axvline(x=0, color='gray', linestyle='--', lw=0.6, zorder=10)
+    h = ax.axhline(y=0, color='gray', linestyle='--', lw=0.6, zorder=10)
+    v.set_visible(False)
+    h.set_visible(False)
+    interactive_axes.append((ax, h, v))
+
+# Agrega los ejes twinx (fase de impedancia y fase de SPL)
+for twin_ax in extra_axes:
+    v = twin_ax.axvline(x=0, color='gray', linestyle='--', lw=0.6, zorder=10)
+    h = twin_ax.axhline(y=0, color='gray', linestyle='--', lw=0.6, zorder=10)
+    v.set_visible(False)
+    h.set_visible(False)
+    interactive_axes.append((twin_ax, h, v))
+
 def cursor_fmt(sel):                                                        # Formatea la anotación del cursor
     x = sel.target[0]
     y = sel.target[1]
@@ -254,6 +276,65 @@ cursor = mplcursors.cursor(all_lines, hover=True)
 cursor.connect("add", cursor_fmt)
 
 plt.tight_layout()
+
+# --------------------------------------------
+# Cursores dinámicos con líneas cruzadas
+# --------------------------------------------
+
+def on_mouse_move(event):
+    if not event.inaxes:
+        return
+
+    ax = event.inaxes
+
+    closest_axis = None
+    closest_line = None
+    closest_y = None
+    min_dist = float('inf')
+
+    for axis, hline, vline in interactive_axes:
+        if axis != ax:
+            continue
+        for line in axis.get_lines():
+            if not line.get_visible():
+                continue
+            xdata = line.get_xdata()
+            ydata = line.get_ydata()
+            if len(xdata) == 0:
+                continue
+            try:
+                x = event.xdata
+                if x is None:
+                    continue
+                y_interp = np.interp(x, xdata, ydata)
+                y_disp = axis.transData.transform((x, y_interp))[1]
+                dist = abs(event.y - y_disp)
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_axis = axis
+                    closest_line = line
+                    closest_y = y_interp
+            except:
+                continue
+
+    # Apaga todos
+    for _, hline, vline in interactive_axes:
+        hline.set_visible(False)
+        vline.set_visible(False)
+
+    # Prende solo en el eje correspondiente
+    if closest_axis is not None and closest_y is not None:
+        for axis, hline, vline in interactive_axes:
+            if axis == closest_axis:
+                x = event.xdata
+                vline.set_xdata([x, x])
+                hline.set_ydata([closest_y, closest_y])
+                vline.set_visible(True)
+                hline.set_visible(True)
+        fig.canvas.draw_idle()
+
+fig.canvas.mpl_connect("motion_notify_event", on_mouse_move)
+
 plt.show()
 
 #====================================================================================================================================
