@@ -1,18 +1,18 @@
-import tkinter as tk
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.pyplot as plt
-import numpy as np
-import sys
-from core.driver import Driver
-from visualization.plots import plot_all
+import tkinter as tk                                                # Importar tkinter para la interfaz gráfica
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg     # Importar el backend de matplotlib para Tkinter
+import matplotlib.pyplot as plt                                     # Importar matplotlib para graficar
+import numpy as np                                                  # Importar numpy para cálculos numéricos
+import sys                                                          # Importar sys para manejar el cierre de la aplicación
+from core.driver import Driver                                      # Importar la clase Driver para simular el parlante
+from visualization.plots import plot_all                            # Importar la función para graficar todos los datos
 
-class App:
-    def __init__(self, root, params, units):
-        self.root = root
-        self.params = params.copy()
-        self.units = units
-        self.user_params = params.copy()
-        self.driver = None
+class App:                                                          # Clase principal de la aplicación
+    def __init__(self, root, params, units):                        # Constructor de la clase
+        self.root = root                                            # Guardar la referencia a la ventana principal
+        self.params = params.copy()                                 # Copiar los parámetros iniciales
+        self.units = units                                          # Guardar las unidades de los parámetros
+        self.user_params = params.copy()                            # Copiar los parámetros para el usuario
+        self.driver = None                                          # Inicializar el driver como None
 
         # PanedWindow horizontal: izquierda (panel izquierdo) y derecha (gráfica)
         self.h_paned = tk.PanedWindow(root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED)
