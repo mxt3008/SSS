@@ -7,7 +7,7 @@ import mplcursors
 def plot_all(
     my_driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
     displacements_mm, velocities, excursions_mm, excursion_ratio, f_max,
-    fig=None, axs=None, color="b", linestyle="-"
+    fig=None, axs=None, linestyle="-"
 ):
     if fig is None or axs is None:
         fig, axs = plt.subplots(3, 3, figsize=(14, 10))
@@ -19,11 +19,11 @@ def plot_all(
     # === 1. Impedancia y Fase ===
     axs[0].set_title("Impedancia y Fase Eléctrica")
     ax1 = axs[0]
-    ln1, = ax1.semilogx(frequencies, Z_magnitude, color=color, linestyle=linestyle, label="|Z| [Ohm]")
+    ln1, = ax1.semilogx(frequencies, Z_magnitude, color="b", linestyle=linestyle, label="|Z| [Ohm]")
     ax1.set_ylabel("Impedancia [Ohm]", color='b')
     ax1.tick_params(axis='y', labelcolor='b')
     ax2 = ax1.twinx()
-    ln2, = ax2.semilogx(frequencies, Z_phase, color=color, linestyle=linestyle, label="∠Z [°]")
+    ln2, = ax2.semilogx(frequencies, Z_phase, color="r", linestyle=linestyle, label="∠Z [°]")
     ax2.set_ylabel("Fase [°]", color='r')
     ax2.tick_params(axis='y', labelcolor='r')
     lns1 = [ln1, ln2]
@@ -35,12 +35,12 @@ def plot_all(
     # === 2. SPL y Fase ===
     axs[1].set_title("Respuesta SPL y Fase")
     ax_spl = axs[1]
-    ln3, = ax_spl.semilogx(frequencies, SPL_total, color=color, linestyle=linestyle, label="SPL Total")
+    ln3, = ax_spl.semilogx(frequencies, SPL_total, color="b", linestyle=linestyle, label="SPL Total")
     ax_spl.set_ylabel("SPL [dB]", color='b')
     ax_spl.tick_params(axis='y', labelcolor='b')
     ax_spl.yaxis.set_major_locator(MultipleLocator(10))
     ax_phase = ax_spl.twinx()
-    ln4, = ax_phase.semilogx(frequencies, SPL_phase, color=color, linestyle=linestyle, label="Fase SPL [°]")
+    ln4, = ax_phase.semilogx(frequencies, SPL_phase, color="g", linestyle=linestyle, label="Fase SPL [°]")
     ax_phase.set_ylabel("Fase [°]", color='g')
     ax_phase.set_ylim(-180, 180)
     ax_phase.tick_params(axis='y', labelcolor='g')
@@ -52,7 +52,7 @@ def plot_all(
 
     # === 3. Desplazamiento de la bobina ===
     axs[2].set_title("Desplazamiento de la Bobina")
-    ln_disp, = axs[2].semilogx(frequencies, displacements_mm, color=color, linestyle=linestyle, label="Desplazamiento [mm]")
+    ln_disp, = axs[2].semilogx(frequencies, displacements_mm, color="b", linestyle=linestyle, label="Desplazamiento [mm]")
     axs[2].set_ylabel("Desplazamiento [mm]")
     axs[2].legend()
     axs[2].set_xlabel("Frecuencia [Hz]")
@@ -60,7 +60,7 @@ def plot_all(
 
     # === 4. Velocidad del cono ===
     axs[3].set_title("Velocidad del Cono")
-    ln6, = axs[3].semilogx(frequencies, velocities, color=color, linestyle=linestyle, label="Velocidad [m/s]")
+    ln6, = axs[3].semilogx(frequencies, velocities, color="m", linestyle=linestyle, label="Velocidad [m/s]")
     axs[3].set_ylabel("Velocidad [m/s]")
     axs[3].legend()
     axs[3].set_xlabel("Frecuencia [Hz]")
@@ -84,8 +84,8 @@ def plot_all(
 
     # === 9. Excursión pico y relación con Xmax ===
     axs[8].set_title("Excursión pico y Relación con Xmax")
-    ln7, = axs[8].semilogx(frequencies, excursions_mm, color=color, linestyle=linestyle, label="Excursión [mm]")
-    ln8, = axs[8].semilogx(frequencies, excursion_ratio, color=color, linestyle=linestyle, label="Excursión/Xmax")
+    ln7, = axs[8].semilogx(frequencies, excursions_mm, color="b", linestyle=linestyle, label="Excursión [mm]")
+    ln8, = axs[8].semilogx(frequencies, excursion_ratio, color="g", linestyle=linestyle, label="Excursión/Xmax")
     hline = axs[8].axhline(1, color="red", linestyle=":", label="Límite Xmax")
     axs[8].legend()
     axs[8].set_xlabel("Frecuencia [Hz]")

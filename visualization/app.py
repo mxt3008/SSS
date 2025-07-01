@@ -65,6 +65,9 @@ class App:
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.right_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
 
+        # Maximizar subgráfica al doble clic
+        self.fig.canvas.mpl_connect("button_press_event", self.on_subplot_click)
+
         # Manejar cierre de ventana
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -93,11 +96,9 @@ class App:
         self.resumen_text.config(state="disabled")
 
     def update_plots(self):
-        # Alternar color y estilo
-        colors = ["b", "g", "r", "c", "m", "y", "k"]
+        # Alternar solo el estilo de línea
         linestyles = ["-", "--", "-.", ":"]
-        color = colors[self.plot_count % len(colors)]
-        linestyle = linestyles[(self.plot_count // len(colors)) % len(linestyles)]
+        linestyle = linestyles[self.plot_count % len(linestyles)]
 
         f_max = self.driver.f_max_ka()
         frequencies = np.logspace(np.log10(5), np.log10(f_max), 1000)
@@ -117,7 +118,7 @@ class App:
         lines = plot_all(
             self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
             displacements_mm, velocities, excursions_mm, excursion_ratio, f_max,
-            fig=self.fig, axs=self.axs, color=color, linestyle=linestyle
+            fig=self.fig, axs=self.axs, linestyle=linestyle
         )
         self.canvas.draw()
 
@@ -127,7 +128,7 @@ class App:
 
         # Crear checkbox para esta simulación
         var = tk.BooleanVar(value=True)
-        label = f"Simulación {self.plot_count} ({color}{linestyle})"
+        label = f"Simulación {self.plot_count} ({linestyle})"
         cb = tk.Checkbutton(self.checkbox_frame, text=label, variable=var,
                             command=lambda idx=len(self.plot_lines)-1: self.toggle_lines(idx))
         cb.pack(anchor="w")
@@ -139,6 +140,29 @@ class App:
         for line in self.plot_lines[idx]:
             line.set_visible(visible)
         self.canvas.draw()
+
+    def on_subplot_click(self, event):
+        if event.dblclick:
+            self.maximize_subplot(event)
+
+    def maximize_subplot(self, event):
+        ax = event.inaxes
+        if ax is None:
+            return
+        fig = plt.figure(figsize=(8, 6))
+        new_ax = fig.add_subplot(111)
+        for line in ax.get_lines():
+            new_ax.plot(line.get_xdata(), line.get_ydata(),
+                        color=line.get_color(),
+                        linestyle=line.get_linestyle(),
+                        label=line.get_label(),
+                        visible=line.get_visible())
+        new_ax.set_title(ax.get_title())
+        new_ax.set_xlabel(ax.get_xlabel())
+        new_ax.set_ylabel(ax.get_ylabel())
+        new_ax.legend()
+        fig.tight_layout()
+        fig.show()
 
     def on_close(self):
         self.root.destroy()
