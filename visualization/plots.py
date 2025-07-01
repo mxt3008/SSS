@@ -6,9 +6,11 @@ import mplcursors
 
 def plot_all(
     my_driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-    displacements_mm, velocities, excursions_mm, excursion_ratio, f_max
+    displacements_mm, velocities, excursions_mm, excursion_ratio, f_max,
+    fig=None, axs=None
 ):
-    fig, axs = plt.subplots(3, 3, figsize=(14, 10))
+    if fig is None or axs is None:
+        fig, axs = plt.subplots(3, 3, figsize=(14, 10))
     axs = axs.flatten()
     fig.suptitle("Análisis del Comportamiento de un Parlante en Aire Libre", fontsize=12, fontweight='bold')
 
@@ -235,4 +237,4 @@ def plot_all(
                 fig.canvas.draw_idle()
     fig.canvas.mpl_connect("button_press_event", on_double_click)
 
-    plt.show()
+    return fig, axs
