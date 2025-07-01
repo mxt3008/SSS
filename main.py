@@ -18,6 +18,8 @@ import matplotlib.pyplot as plt                                             # Pa
 import matplotlib.ticker as ticker                                          # Para formatear ejes en gráficos
 from matplotlib.ticker import LogLocator, FixedLocator                      # Para formatear ejes logarítmicos y escalares
 import mplcursors                                                           # Para agregar cursores interactivos a los gráficos
+import tkinter as tk
+from tkinter import simpledialog, messagebox
 
 from core.driver import Driver                                              # Importa la clase Driver definida en core/driver.py
 
@@ -43,27 +45,55 @@ params = {
     "Xmax": 7.5                                 # Excursión máxima lineal del cono [milímetros]
 }
 
-#  --------------------------------------------
-# Menú interactivo - Se introducen parámetros TS (Enter para usar los valores por defecto)
+# Diccionario de unidades para cada parámetro
+units = {
+    "Fs": "Hz",
+    "Mms": "kg",
+    "Vas": "litros",
+    "Qts": "",
+    "Qes": "",
+    "Qms": "",
+    "Re": "Ω",
+    "Bl": "N/A",
+    "Sd": "m²",
+    "Le": "H",
+    "Xmax": "mm"
+}
 
-#  --------------------------------------------
+def pedir_parametros(params, units):
+    root = tk.Tk()
+    root.withdraw()
+    user_params = {}
+    for key, default in params.items():
+        unidad = units.get(key, "")
+        prompt = f"{key} [{unidad} - Valor default: {default}]"
+        val = simpledialog.askstring("Parámetro TS", prompt)
+        if val is None or val.strip() == "":
+            user_params[key] = default
+        else:
+            try:
+                user_params[key] = float(val)
+            except ValueError:
+                messagebox.showwarning("Valor inválido", f"Valor inválido para {key}. Se usará valor por defecto: {default}")
+                user_params[key] = default
+    root.destroy()
+    return user_params
+
+def mostrar_parametros_derivados(driver):
+    resumen = driver.resumen_parametros()
+    root = tk.Tk()
+    root.withdraw()
+    messagebox.showinfo("Parámetros Derivados", resumen)
+    root.destroy()
+
 print("\n=====================================================================")
 print("=== Simulador de Driver ===")
 print("=== Parámetros por defecto utilizados - JBL 2206H ===")
 print("\nIntroduce parámetros TS del altavoz (Enter = usa valores por defecto)\n")
 
-for key, default in params.items():
-    val = input(f"{key} [{default}]: ")         # Solicita al usuario el valor del parámetro
-    if val.strip() == "":
-        params[key] = default                   # Si el usuario deja vacío, usa valor por defecto
-    else:
-        try:
-            params[key] = float(val)            # Convierte a float el valor ingresado
-        except ValueError:
-            print(f"⚠️ Valor inválido para {key}. Se usará valor por defecto: {default}")
-            params[key] = default
-
-my_driver = Driver(params)                      # Crea una instancia del driver con los parámetros definidos
+params = pedir_parametros(params, units)
+my_driver = Driver(params)
+mostrar_parametros_derivados(my_driver)
 
 # --------------------------------------------
 # Calcular y mostrar impedancia y SPL para una frecuencia específica

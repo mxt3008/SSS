@@ -4,6 +4,7 @@
 
 import numpy as np                          # Importa numpy para cálculos matemáticos complejos
 from scipy.special import j1                # Importa la función Bessel de primer orden para cálculos de SPL - Directividad del pistón
+import textwrap
 
 class Driver:
     def __init__(self, params):
@@ -85,8 +86,8 @@ class Driver:
         # Resumen en consola
         # Imprime los parámetros del driver de forma legible
         # -------------------------------
-        
-        print(f"""
+    def resumen_parametros(self):
+        return textwrap.dedent(f"""
         ===========================================
         DRIVER PARAMETERS
         ===========================================
@@ -115,6 +116,7 @@ class Driver:
 
         ===========================================
         """)
+        print(self.resumen_parametros())
 
 #====================================================================================================================================
 #====================================================================================================================================
