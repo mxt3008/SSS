@@ -18,7 +18,7 @@ class App:
         self.h_paned = tk.PanedWindow(root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED)
         self.h_paned.pack(fill="both", expand=True)
 
-        # PanedWindow vertical para el panel izquierdo (formulario y resumen)
+        # PanedWindow vertical para el panel izquierdo (formulario, resumen, checkboxes)
         self.v_paned = tk.PanedWindow(self.h_paned, orient=tk.VERTICAL, sashrelief=tk.RAISED)
         self.h_paned.add(self.v_paned, minsize=350)
 
@@ -51,6 +51,10 @@ class App:
         self.scrollbar.pack(side="right", fill="y")
         self.resumen_text.config(yscrollcommand=self.scrollbar.set)
 
+        # Frame para checkboxes de curvas (abajo del resumen)
+        self.checkbox_frame = tk.LabelFrame(self.v_paned, text="Curvas simuladas")
+        self.v_paned.add(self.checkbox_frame, minsize=60)
+
         # Frame derecho (gráfica)
         self.right_frame = tk.Frame(self.h_paned)
         self.h_paned.add(self.right_frame)
@@ -63,6 +67,11 @@ class App:
 
         # Manejar cierre de ventana
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        self.plot_count = 0
+        self.plot_lines = []  # Lista de listas de líneas por simulación
+        self.check_vars = []  # Variables de los checkboxes
+        self.checkboxes = []  # Referencias a los checkboxes
 
     def on_submit(self):
         # Leer parámetros
@@ -84,6 +93,12 @@ class App:
         self.resumen_text.config(state="disabled")
 
     def update_plots(self):
+        # Alternar color y estilo
+        colors = ["b", "g", "r", "c", "m", "y", "k"]
+        linestyles = ["-", "--", "-.", ":"]
+        color = colors[self.plot_count % len(colors)]
+        linestyle = linestyles[(self.plot_count // len(colors)) % len(linestyles)]
+
         f_max = self.driver.f_max_ka()
         frequencies = np.logspace(np.log10(5), np.log10(f_max), 1000)
         Z_values = np.array([self.driver.impedance(f) for f in frequencies])
@@ -98,13 +113,31 @@ class App:
         excursions_mm = excursions * 1000
         excursion_ratio = excursions / self.driver.Xmax
 
-        for ax in self.axs.flatten():
-            ax.clear()
-        plot_all(
+        # Graficar y obtener las líneas de esta simulación
+        lines = plot_all(
             self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
             displacements_mm, velocities, excursions_mm, excursion_ratio, f_max,
-            fig=self.fig, axs=self.axs
+            fig=self.fig, axs=self.axs, color=color, linestyle=linestyle
         )
+        self.canvas.draw()
+
+        # Guardar las líneas para controlarlas con los checkboxes
+        self.plot_lines.append(lines)
+        self.plot_count += 1
+
+        # Crear checkbox para esta simulación
+        var = tk.BooleanVar(value=True)
+        label = f"Simulación {self.plot_count} ({color}{linestyle})"
+        cb = tk.Checkbutton(self.checkbox_frame, text=label, variable=var,
+                            command=lambda idx=len(self.plot_lines)-1: self.toggle_lines(idx))
+        cb.pack(anchor="w")
+        self.check_vars.append(var)
+        self.checkboxes.append(cb)
+
+    def toggle_lines(self, idx):
+        visible = self.check_vars[idx].get()
+        for line in self.plot_lines[idx]:
+            line.set_visible(visible)
         self.canvas.draw()
 
     def on_close(self):
