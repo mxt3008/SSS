@@ -81,10 +81,15 @@ def pedir_parametros(params, units):
 
 def mostrar_parametros_derivados(driver):
     resumen = driver.resumen_parametros()
-    root = tk.Tk()
-    root.withdraw()
-    messagebox.showinfo("Parámetros Derivados", resumen)
-    root.destroy()
+    resumen_window = tk.Tk()
+    resumen_window.title("Parámetros Derivados")
+    resumen_window.geometry("500x600")
+    text = tk.Text(resumen_window, wrap="word", font=("Consolas", 10))
+    text.insert("1.0", resumen)
+    text.config(state="disabled")
+    text.pack(expand=True, fill="both")
+    # No hacemos withdraw ni destroy aquí
+    # La ventana se puede cerrar manualmente y la gráfica aparecerá igual
 
 print("\n=====================================================================")
 print("=== Simulador de Driver ===")

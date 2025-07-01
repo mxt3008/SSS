@@ -88,9 +88,9 @@ class Driver:
         # -------------------------------
     def resumen_parametros(self):
         return textwrap.dedent(f"""
-        ===========================================
+        =======================================
         DRIVER PARAMETERS
-        ===========================================
+        =======================================
 
         Parámetros primarios:
         Fs    = {self.Fs:.2f} Hz         (Frecuencia de resonancia)
@@ -114,7 +114,7 @@ class Driver:
         rho0  = {self.rho0:.3f} kg/m³    (Densidad del aire)
         c     = {self.c:.2f} m/s         (Velocidad del sonido)
 
-        ===========================================
+        =======================================
         """)
         print(self.resumen_parametros())
 
