@@ -289,7 +289,11 @@ class App:
         excursions_mm = excursions * 1000
         excursion_ratio = excursions / self.driver.Xmax
 
+        # Guarda el nombre del driver para esta simulación
+        if not hasattr(self, "sim_names"):
+            self.sim_names = []
         nombre_driver = self.name_var.get().strip() or f"Simulación {self.plot_count+1}"
+        self.sim_names.append(nombre_driver)
 
         # Solo crea la figura y canvas la primera vez
         if self.fig is None or self.axs is None or self.canvas is None:
@@ -334,13 +338,19 @@ class App:
         self.plot_lines.append(lines)
         self.plot_count += 1
 
+        # Elimina los checkboxes anteriores
         for cb in self.checkboxes:
             cb.destroy()
         self.check_vars = []
         self.checkboxes = []
         for idx, lineset in enumerate(self.plot_lines):
             var = tk.BooleanVar(value=True)
-            label = f"Simulación {idx+1} ({linestyles[idx % len(linestyles)]})"
+            # Usa el nombre guardado en self.sim_names
+            if hasattr(self, "sim_names") and idx < len(self.sim_names):
+                nombre = self.sim_names[idx]
+            else:
+                nombre = f"Simulación {idx+1}"
+            label = f"{nombre} ({linestyles[idx % len(linestyles)]})"
             cb = tk.Checkbutton(self.checkboxes_container, text=label, variable=var,
                                 command=lambda idx=idx: self.toggle_lines(idx))
             cb.pack(fill="x", padx=4, pady=2)
@@ -361,55 +371,92 @@ class App:
             self.maximize_subplot(event)
 
     def maximize_subplot(self, event):
+        import matplotlib.pyplot as plt
         import mplcursors
-        ax = event.inaxes
-        if ax is None:
+        import numpy as np
+
+        ax_clicked = event.inaxes
+        if ax_clicked is None:
             return
+
+        # Encuentra todos los ejes que comparten posición (principal y twin)
+        axes_same_pos = []
+        for other_ax in ax_clicked.figure.axes:
+            if np.allclose(ax_clicked.get_position().bounds, other_ax.get_position().bounds):
+                axes_same_pos.append(other_ax)
+
+        # Distingue principal y twin por el atributo 'yaxis'
+        if len(axes_same_pos) == 2:
+            # Ordena: principal primero, twin después
+            if axes_same_pos[0].yaxis.get_label_position() == 'left':
+                ax_main, ax_twin = axes_same_pos
+            else:
+                ax_twin, ax_main = axes_same_pos
+        else:
+            ax_main = ax_clicked
+            ax_twin = None
+
         fig = plt.figure(figsize=(8, 6))
         new_ax = fig.add_subplot(111)
 
-        # Copiar líneas del eje principal
-        for line in ax.get_lines():
+        # Copia todas las líneas del eje principal
+        for line in ax_main.get_lines():
             new_ax.plot(line.get_xdata(), line.get_ydata(),
                         color=line.get_color(),
                         linestyle=line.get_linestyle(),
                         label=line.get_label(),
                         visible=line.get_visible())
+        new_ax.set_xlabel(ax_main.get_xlabel(), fontsize=9)
+        new_ax.set_ylabel(ax_main.get_ylabel(), fontsize=9)
+        new_ax.set_title(ax_main.get_title() or "Gráfica", fontsize=10, fontweight='bold')
+        new_ax.grid(True, which="both")
+        new_ax.set_xscale(ax_main.get_xscale())
+        new_ax.tick_params(axis='both', labelsize=8)
+        new_ax.set_xlim(ax_main.get_xlim())
+        new_ax.set_ylim(ax_main.get_ylim())
 
-        # Si hay eje secundario (twinx), copiar también sus líneas
-        twin_ax = None
-        for other_ax in ax.figure.axes:
-            if other_ax is not ax and hasattr(other_ax, 'get_shared_x_axes') and ax.get_shared_x_axes() == other_ax.get_shared_x_axes():
-                twin_ax = other_ax
-                break
+        new_ax.yaxis.label.set_color(new_ax.get_lines()[0].get_color())
+        new_ax.tick_params(axis='y', colors=new_ax.get_lines()[0].get_color())
+        new_ax.spines['left'].set_color(new_ax.get_lines()[0].get_color())
+        new_ax.xaxis.label.set_color('black')
+        new_ax.tick_params(axis='x', colors='black')
+        new_ax.spines['bottom'].set_color('black')
 
-        if twin_ax:
+        # Si hay twin, copiar también sus líneas y etiquetas
+        if ax_twin:
             new_twin = new_ax.twinx()
-            for line in twin_ax.get_lines():
+            for line in ax_twin.get_lines():
                 new_twin.plot(line.get_xdata(), line.get_ydata(),
                               color=line.get_color(),
                               linestyle=line.get_linestyle(),
                               label=line.get_label(),
                               visible=line.get_visible())
-            new_twin.set_ylabel(twin_ax.get_ylabel(), fontsize=9)
-            new_twin.legend(fontsize=9, loc="upper right")
+            new_twin.set_ylabel(ax_twin.get_ylabel(), fontsize=9)
+            new_twin.yaxis.label.set_color(new_twin.get_lines()[0].get_color())
+            new_twin.tick_params(axis='y', colors=new_twin.get_lines()[0].get_color())
+            new_twin.spines['right'].set_color(new_twin.get_lines()[0].get_color())
+            # Leyendas
+            handles1, labels1 = new_ax.get_legend_handles_labels()
+            handles2, labels2 = new_twin.get_legend_handles_labels()
+            if handles1:
+                new_ax.legend(handles1, labels1, loc="upper left", fontsize=9)
+            if handles2:
+                new_twin.legend(handles2, labels2, loc="upper right", fontsize=9)
         else:
-            new_ax.legend(fontsize=9)
+            handles, labels = new_ax.get_legend_handles_labels()
+            if handles:
+                new_ax.legend(handles, labels, fontsize=9)
 
-        # Título y etiquetas
-        title = ax.get_title() or "Gráfica"
-        new_ax.set_title(title, fontsize=10, fontweight='bold')
-        new_ax.set_xlabel(ax.get_xlabel(), fontsize=9)
-        new_ax.set_ylabel(ax.get_ylabel(), fontsize=9)
-        new_ax.grid(True, which="both")
-        new_ax.set_xscale('log')
-        new_ax.xaxis.set_major_locator(LogLocator(base=10.0, numticks=10))
-        new_ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10)*.1, numticks=10))
-        new_ax.xaxis.set_major_formatter(ScalarFormatter())
-        new_ax.tick_params(axis='both', labelsize=8)
-        if "SPL" in new_ax.get_title():
-            new_ax.yaxis.set_major_locator(MultipleLocator(10))
+        # Escala logarítmica y formato de ticks si corresponde
+        if ax_main.get_xscale() == "log":
+            from matplotlib.ticker import LogLocator, ScalarFormatter
+            new_ax.set_xscale('log')
+            new_ax.xaxis.set_major_locator(LogLocator(base=10.0, numticks=10))
+            new_ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10)*.1, numticks=10))
+            new_ax.xaxis.set_major_formatter(ScalarFormatter())
+            new_ax.tick_params(axis='both', labelsize=8)
 
+        # Cursor interactivo solo para el eje principal
         cursor = mplcursors.cursor(new_ax.get_lines(), hover=True)
         def cursor_fmt(sel):
             x = sel.target[0]
@@ -434,6 +481,38 @@ class App:
                 y_unit = ""
             sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
         cursor.connect("add", cursor_fmt)
+
+        # Cursor para ejes twin (si existen)
+        import itertools
+
+        all_lines = list(new_ax.get_lines())
+        if ax_twin:
+            all_lines += list(new_twin.get_lines())
+        cursor = mplcursors.cursor(all_lines, hover=True)
+        def cursor_fmt(sel):
+            x = sel.target[0]
+            y = sel.target[1]
+            x_label = f"{x/1000:.1f}k" if x >= 1000 else f"{x:.0f}"
+            label = sel.artist.get_label()
+            if "∠Z" in label or "Phase" in label or "Fase" in label:
+                y_unit = "°"
+            elif "|Z|" in label:
+                y_unit = "Ω"
+            elif "SPL" in label:
+                y_unit = "dB"
+            elif "Desplazamiento" in label:
+                y_unit = "mm"
+            elif "Velocidad" in label:
+                y_unit = "m/s"
+            elif "Excursión/Xmax" in label:
+                y_unit = "(ratio)"
+            elif "Excursión" in label:
+                y_unit = "mm"
+            else:
+                y_unit = ""
+            sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
+        cursor.connect("add", cursor_fmt)
+
         fig.tight_layout()
         fig.show()
 

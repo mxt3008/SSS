@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator, FixedLocator, LogLocator
 import matplotlib.ticker as ticker
+from matplotlib.ticker import ScalarFormatter
 import matplotlib
 import matplotlib.offsetbox
 
@@ -224,6 +225,29 @@ def plot_all(
             ax.grid(False, axis='y')
             ax.yaxis.grid(False, which='both')
 
+    plot_all._subplot_data = {
+        0: {  # Impedancia y Fase
+            "x": frequencies,
+            "y1": Z_magnitude,
+            "y2": Z_phase,
+            "ylabel1": "Impedancia [Ohm]",
+            "ylabel2": "Fase [°]",
+            "title": "Impedancia y Fase Eléctrica",
+            "label1": "|Z| [Ohm]",
+            "label2": "∠Z [°]",
+        },
+        1: {  # SPL y Fase
+            "x": frequencies,
+            "y1": SPL_total,
+            "y2": SPL_phase,
+            "ylabel1": "SPL [dB]",
+            "ylabel2": "Fase [°]",
+            "title": "Respuesta SPL y Fase",
+            "label1": "SPL Total",
+            "label2": "Fase SPL [°]",
+        },
+        # ...puedes agregar más si quieres otras dobles...
+    }
     return lines, cursor
 
 def maximize_subplot(self, event):
