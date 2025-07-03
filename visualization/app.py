@@ -250,11 +250,10 @@ class App:
 
     def toggle_legends(self):
         self.show_legends = not self.show_legends
-        # Cambia el texto del botón
         self.legend_btn.config(text="Ocultar leyendas" if self.show_legends else "Mostrar leyendas")
-        # Mostrar u ocultar leyendas en todos los ejes
-        if self.axs is not None:
-            for ax in self.axs.flatten():
+        # Mostrar u ocultar leyendas en todos los ejes (incluyendo twins)
+        if self.axs is not None and self.fig is not None:
+            for ax in self.fig.axes:
                 leg = ax.get_legend()
                 if leg:
                     leg.set_visible(self.show_legends)
@@ -387,7 +386,6 @@ class App:
 
         # Distingue principal y twin por el atributo 'yaxis'
         if len(axes_same_pos) == 2:
-            # Ordena: principal primero, twin después
             if axes_same_pos[0].yaxis.get_label_position() == 'left':
                 ax_main, ax_twin = axes_same_pos
             else:
@@ -422,6 +420,9 @@ class App:
         new_ax.tick_params(axis='x', colors='black')
         new_ax.spines['bottom'].set_color('black')
 
+        leg1 = None
+        leg2 = None
+
         # Si hay twin, copiar también sus líneas y etiquetas
         if ax_twin:
             new_twin = new_ax.twinx()
@@ -435,17 +436,26 @@ class App:
             new_twin.yaxis.label.set_color(new_twin.get_lines()[0].get_color())
             new_twin.tick_params(axis='y', colors=new_twin.get_lines()[0].get_color())
             new_twin.spines['right'].set_color(new_twin.get_lines()[0].get_color())
-            # Leyendas
+            # Leyendas SIEMPRE creadas y con visibilidad según el estado global
             handles1, labels1 = new_ax.get_legend_handles_labels()
             handles2, labels2 = new_twin.get_legend_handles_labels()
             if handles1:
-                new_ax.legend(handles1, labels1, loc="upper left", fontsize=9)
-            if handles2:
-                new_twin.legend(handles2, labels2, loc="upper right", fontsize=9)
+                leg1 = new_ax.legend(handles1, labels1, loc="upper left", fontsize=9)
+                leg1.set_visible(self.show_legends)
+            # Fuerza la leyenda del twin aunque matplotlib no la cree automáticamente
+            if handles2 and any(lab != "_nolegend_" for lab in labels2):
+                leg2 = new_twin.legend(handles2, labels2, loc="upper right", fontsize=9)
+                leg2.set_visible(self.show_legends)
+            elif len(new_twin.get_lines()) > 0:
+                # Forzar leyenda si hay líneas pero no labels válidos
+                labs = [l.get_label() for l in new_twin.get_lines()]
+                leg2 = new_twin.legend(new_twin.get_lines(), labs, loc="upper right", fontsize=9)
+                leg2.set_visible(self.show_legends)
         else:
             handles, labels = new_ax.get_legend_handles_labels()
             if handles:
-                new_ax.legend(handles, labels, fontsize=9)
+                leg1 = new_ax.legend(handles, labels, fontsize=9)
+                leg1.set_visible(self.show_legends)
 
         # Escala logarítmica y formato de ticks si corresponde
         if ax_main.get_xscale() == "log":
@@ -456,35 +466,7 @@ class App:
             new_ax.xaxis.set_major_formatter(ScalarFormatter())
             new_ax.tick_params(axis='both', labelsize=8)
 
-        # Cursor interactivo solo para el eje principal
-        cursor = mplcursors.cursor(new_ax.get_lines(), hover=True)
-        def cursor_fmt(sel):
-            x = sel.target[0]
-            y = sel.target[1]
-            x_label = f"{x/1000:.1f}k" if x >= 1000 else f"{x:.0f}"
-            label = sel.artist.get_label()
-            if "∠Z" in label or "Phase" in label or "Fase" in label:
-                y_unit = "°"
-            elif "|Z|" in label:
-                y_unit = "Ω"
-            elif "SPL" in label:
-                y_unit = "dB"
-            elif "Desplazamiento" in label:
-                y_unit = "mm"
-            elif "Velocidad" in label:
-                y_unit = "m/s"
-            elif "Excursión/Xmax" in label:
-                y_unit = "(ratio)"
-            elif "Excursión" in label:
-                y_unit = "mm"
-            else:
-                y_unit = ""
-            sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
-        cursor.connect("add", cursor_fmt)
-
-        # Cursor para ejes twin (si existen)
-        import itertools
-
+        # Cursor interactivo para TODAS las líneas (principal y twin)
         all_lines = list(new_ax.get_lines())
         if ax_twin:
             all_lines += list(new_twin.get_lines())

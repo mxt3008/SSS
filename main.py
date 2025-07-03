@@ -1,6 +1,6 @@
 # --------------------------------------------
 # main.py
-# Script principal para simular y analizar el comportamiento de un parlante en aire libre.
+# Script principal para simular y analizar el comportamiento de un parlante.
 # --------------------------------------------
 
 #====================================================================================================================================
