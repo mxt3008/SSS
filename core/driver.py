@@ -330,8 +330,36 @@ class Driver:
 
 #====================================================================================================================================
     # ===============================
-    # 5. Potencia acústica - Real y Reactiva
+    # 5. Potencia acústica
     # ===============================
+
+    def power_real(self, f, U=2.83):                # Deriva la potencia real
+        Z = self.impedance(f)
+        I = U / Z
+        P_real = (U * np.conj(I)).real              # Potencia real P = U * I*
+        return P_real
+
+    def power_reactive(self, f, U=2.83):            # Deriva la potencia reactiva
+        Z = self.impedance(f)
+        I = U / Z
+        P_reactive = (U * np.conj(I)).imag          # Potencia reactiva Q = U * I*
+        return P_reactive   
+
+    def power_apparent(self, f, U=2.83):            # Deriva la potencia aparente
+        Z = self.impedance(f)
+        I = U / Z
+        P_apparent = abs(U * np.conj(I))            # Potencia aparente S = |U * I*|
+        return P_apparent
+
+    def power_ac(self, f, U=2.83):                  # Deriva la potencia acústica
+        v = self.velocity(f, U)
+        v_abs2 = abs(v)**2
+        rho0 = self.rho0
+        c = self.c
+        Sd = self.Sd
+        P_ac = 0.5 * rho0 * c * (Sd**2) * v_abs2    # Potencia acústica P_ac = 0.5 * rho0 * c * Sd² * |v|²
+        return P_ac
+
 
 #====================================================================================================================================
     # ===============================

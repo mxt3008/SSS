@@ -8,7 +8,7 @@ import matplotlib.offsetbox
 
 def plot_all(
     my_driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-    displacements_mm, velocities, excursions_mm, excursion_ratio, f_max,
+    displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, excursions_mm, excursion_ratio, f_max,
     fig=None, axs=None, linestyle="-", label="Simulación", show_legend=True,
     enable_cursor=False,
     grid_cursor=None
@@ -109,10 +109,31 @@ def plot_all(
     axs[3].legend(fontsize=label_fontsize)
     lines.append(ln6)
 
-    # 5. Potencia acústica
-    axs[4].set_title("Potencia Acústica", fontsize=title_fontsize, fontweight='bold')
-    axs[4].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
-    axs[4].tick_params(axis='both', labelsize=tick_fontsize)
+    # 5. Potencias Eléctricas y Acústica
+    axs[4].set_title("Potencias Eléctricas y Acústica", fontsize=title_fontsize, fontweight='bold')
+    ax5 = axs[4]
+
+    ln7, = ax5.semilogx(frequencies, P_real, color="b", linestyle=linestyle, label=f"P. Real [W] - {label}")
+    ln8, = ax5.semilogx(frequencies, P_reactiva, color="r", linestyle=linestyle, label=f"P. Reactiva [VAR] - {label}")
+    ln9, = ax5.semilogx(frequencies, P_aparente, color="orange", linestyle="--", label=f"P. Aparente [VA] - {label}")
+    ax5.set_ylabel("Potencias Eléctricas [W/VA]", color='k', fontsize=label_fontsize, labelpad=2)
+    ax5.tick_params(axis='y', labelcolor='k', labelsize=tick_fontsize)
+
+    twin5 = ax5.twinx()
+    ln10, = twin5.semilogx(frequencies, P_ac, color="g", linestyle=":", label=f"P. Acústica [W] - {label}")
+    twin5.set_ylabel("Potencia Acústica [W]", color='g', fontsize=label_fontsize, labelpad=2)
+    twin5.tick_params(axis='y', labelcolor='g', labelsize=tick_fontsize)
+    twin5.yaxis.set_label_coords(1.12, 0.5)
+
+    ax5.set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
+    ax5.tick_params(axis='x', labelsize=tick_fontsize)
+    ax5.grid(True, which="both")
+    twin5.grid(False)
+
+    lns_power = [ln7, ln8, ln9, ln10]
+    labs_power = [l.get_label() for l in lns_power]
+    if show_legend:
+        ax5.legend(lns_power, labs_power, loc="upper left", fontsize=label_fontsize)
 
     # 6. Retardo de grupo
     axs[5].set_title("Retardo de Grupo", fontsize=title_fontsize, fontweight='bold')
@@ -131,13 +152,13 @@ def plot_all(
 
     # 9. Excursión pico y relación con Xmax
     axs[8].set_title("Excursión pico y Relación con Xmax", fontsize=title_fontsize, fontweight='bold')
-    ln7, = axs[8].semilogx(frequencies, excursions_mm, color="b", linestyle=linestyle, label=f"Excursión [mm] - {label}")
-    ln8, = axs[8].semilogx(frequencies, excursion_ratio, color="g", linestyle=linestyle, label=f"Excursión/Xmax - {label}")
+    ln11, = axs[8].semilogx(frequencies, excursions_mm, color="b", linestyle=linestyle, label=f"Excursión [mm] - {label}")
+    ln12, = axs[8].semilogx(frequencies, excursion_ratio, color="g", linestyle=linestyle, label=f"Excursión/Xmax - {label}")
     hline = axs[8].axhline(1, color="red", linestyle=":", label="Límite Xmax")
     axs[8].legend(fontsize=label_fontsize)
     axs[8].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
     axs[8].tick_params(axis='both', labelsize=tick_fontsize)
-    lines.extend([ln7, ln8])
+    lines.extend([ln11, ln12])
 
     # Ajustes de ejes y formato logarítmico
     custom_ticks = [10, 100, 1000, 10000, 15000, 20000]
@@ -246,7 +267,6 @@ def plot_all(
             "label1": "SPL Total",
             "label2": "Fase SPL [°]",
         },
-        # ...puedes agregar más si quieres otras dobles...
     }
     return lines, cursor
 
