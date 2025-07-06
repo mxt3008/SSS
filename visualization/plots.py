@@ -8,7 +8,8 @@ import matplotlib.offsetbox
 
 def plot_all(
     my_driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-    displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, excursions_mm, excursion_ratio, f_max,
+    displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, excursions_mm, 
+    group_delay_vals, step_t, step_v, efficiency_val, excursion_ratio, f_max,
     fig=None, axs=None, linestyle="-", label="Simulación", show_legend=True,
     enable_cursor=False,
     grid_cursor=None
@@ -138,18 +139,36 @@ def plot_all(
 
     # 6. Retardo de grupo
     axs[5].set_title("Retardo de Grupo", fontsize=title_fontsize, fontweight='bold')
+    if group_delay_vals is not None:
+        axs[5].semilogx(frequencies, group_delay_vals, color="b", linestyle=linestyle, label="Retardo de grupo")
+        axs[5].legend(fontsize=label_fontsize)
+    axs[5].set_ylabel("Tiempo [s]", fontsize=label_fontsize)
     axs[5].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
     axs[5].tick_params(axis='both', labelsize=tick_fontsize)
+    axs[5].grid(True, which="both")
 
     # 7. Respuesta al escalón
     axs[6].set_title("Respuesta al Escalón", fontsize=title_fontsize, fontweight='bold')
-    axs[6].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
+    if step_t is not None and step_v is not None:
+        axs[6].plot(step_t, step_v, color="b", linestyle=linestyle, label="Velocidad")
+        axs[6].legend(fontsize=label_fontsize)
+    axs[6].set_ylabel("Velocidad [m/s]", fontsize=label_fontsize)
+    axs[6].set_xlabel("Tiempo [s]", fontsize=label_fontsize, labelpad=2)
     axs[6].tick_params(axis='both', labelsize=tick_fontsize)
+    axs[6].grid(True, which="both")
 
     # 8. Eficiencia
     axs[7].set_title("Eficiencia", fontsize=title_fontsize, fontweight='bold')
-    axs[7].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
+    if efficiency_val is not None:
+        axs[7].bar([0.5], [efficiency_val*100], width=0.3, color='orange', label="Eficiencia [%]")
+        axs[7].set_xlim(0, 1)
+        axs[7].set_xticks([])
+        axs[7].legend(fontsize=label_fontsize)
+    axs[7].set_ylabel("%", fontsize=label_fontsize)
+    axs[7].set_xlabel("", fontsize=label_fontsize)
     axs[7].tick_params(axis='both', labelsize=tick_fontsize)
+    axs[7].grid(True, axis='y')
+
 
     # 9. Excursión pico y relación con Xmax
     axs[8].set_title("Excursión pico y Relación con Xmax", fontsize=title_fontsize, fontweight='bold')

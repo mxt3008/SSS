@@ -4,6 +4,7 @@
 
 import numpy as np                          # Importa numpy para cálculos matemáticos complejos
 from scipy.special import j1                # Importa la función Bessel de primer orden para cálculos de SPL - Directividad del pistón
+from scipy.signal import lti, step          # Importa lti y step para simular la respuesta al escalón del sistema
 import textwrap
 
 class Driver:
@@ -362,11 +363,44 @@ class Driver:
     # ===============================
     # 6. Retardo de grupo
     # ===============================
+    def group_delay_array(self, frequencies):       # Deriva el retardo de grupo para un array de frecuencias
+        
+        if not isinstance(frequencies, (list, np.ndarray)):
+            raise ValueError("Las frecuencias deben ser un array o lista de valores.")
+        if len(frequencies) == 0:
+            raise ValueError("El array de frecuencias no puede estar vacío.")
+        
+        omega = 2 * np.pi * frequencies             # Frecuencia angular
+        Z_array = np.array([self.impedance(f) for f in frequencies])
+        phase = np.unwrap(np.angle(Z_array))        # Fase de la impedancia, sin discontinuidades
+        dphi_domega = np.gradient(phase, omega)     # Derivada de la fase respecto a la frecuencia angular
+        return -dphi_domega                         # En segundos
 
 #====================================================================================================================================
     # ===============================
     # 7. Respuesta al escalón
     # ===============================
+    def step_response(self, t, U=2.83):             # Deriva la respuesta al escalón del sistema
+
+        if not isinstance(t, (list, np.ndarray)):
+            raise ValueError("El tiempo t debe ser un array o lista de valores.")
+        if len(t) == 0:
+            raise ValueError("El array de tiempo no puede estar vacío.")
+        
+        Re = self.Re                                # Resistencia DC de la bobina
+        I = U / Re                                  # Corriente inducida en la bobina a partir del voltaje U
+        Bl = self.Bl                                # Producto flujo-Bobina
+
+        num = [Bl * I]                              # Coeficientes del numerador del sistema
+        # if self.Reh:                                # Si Reh está definido, usa el modelo extendido
+        #     num.append(self.Reh * Bl * I)           # Agrega el término de resistencia extendida al numerador
+        # else:
+        #     num.append(0)                           # Si no, agrega un cero al numerador
+        den = [self.Mms, self.Rms, 1 / self.Cms]    # Coeficientes del denominador del sistema
+        system = lti(num, den)                      # Crea un sistema LTI (Lineal Time-Invariant) con los coeficientes del numerador y denominador
+
+        t_out, v_out = step(system, T=t)            # Simula la respuesta al escalón del sistema LTI en el tiempo t
+        return t_out, v_out                         # Retorna el tiempo y la salida del sistema (desplazamiento del pistón)
     
 #====================================================================================================================================
     # ===============================
