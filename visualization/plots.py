@@ -33,6 +33,7 @@ def plot_all(
         plot_all._twin_axes = {}
         plot_all._twin_axes[0] = axs[0].twinx()  # Para impedancia/fase
         plot_all._twin_axes[1] = axs[1].twinx()  # Para SPL/fase
+        #plot_all._twin_axes[4] = axs[4].twinx()  # Para potencias eléctricas/acústica
     else:
         axs = axs.flatten()
 

@@ -331,24 +331,6 @@ class Driver:
     # 5. Potencia acústica
     # ===============================
 
-<<<<<<< HEAD
-    def power(self, f, U=2.83):
-        Z = self.impedance(f)                       # Impedancia total eléctrica del driver
-        if np.abs(Z) == 0:                          # Evita división por cero
-            raise ValueError("La impedancia Z es cero, no se puede calcular la potencia.")
-        
-        I = U / Z                                   # Corriente inducida en la bobina
-        P_real = (U * np.conj(I)).real              # Potencia real (activa) en W
-        P_reactiva = (U * np.conj(I)).imag           # Potencia reactiva en VAR
-        P_aparente = np.abs(U * np.conj(I))              # Potencia aparente en VA
-
-        
-
-
-
-        return P_real, P_reactiva   
-
-=======
     def power_real(self, f, U=2.83):                # Deriva la potencia real
         Z = self.impedance(f)
         I = U / Z
@@ -376,8 +358,6 @@ class Driver:
         P_ac = 0.5 * rho0 * c * (Sd**2) * v_abs2    # Potencia acústica P_ac = 0.5 * rho0 * c * Sd² * |v|²
         return P_ac
 
-
->>>>>>> df005de9022907892a33f9021acf16c9f31477f7
 #====================================================================================================================================
     # ===============================
     # 6. Retardo de grupo

@@ -175,7 +175,7 @@ class App:
         # Fijar proporción horizontal 30% (izquierda) y 70% (derecha) al inicio
         self.root.update_idletasks()
         total_width = self.root.winfo_width()
-        ancho_izquierdo = int(total_width * 0.25)  # 30%
+        ancho_izquierdo = int(total_width * 0.25)  # 25%
         try:
             self.h_paned.sash_place(0, ancho_izquierdo, 0)
         except Exception:
@@ -374,107 +374,87 @@ class App:
             self.maximize_subplot(event)
 
     def maximize_subplot(self, event):
-        import matplotlib.pyplot as plt
         import mplcursors
         import numpy as np
+        from matplotlib.ticker import LogLocator, ScalarFormatter, MultipleLocator
 
         ax_clicked = event.inaxes
         if ax_clicked is None:
             return
 
-        # Encuentra todos los ejes que comparten posición (principal y twin)
-        axes_same_pos = []
-        for other_ax in ax_clicked.figure.axes:
-            if np.allclose(ax_clicked.get_position().bounds, other_ax.get_position().bounds):
-                axes_same_pos.append(other_ax)
-
-        # Distingue principal y twin por el atributo 'yaxis'
-        if len(axes_same_pos) == 2:
-            if axes_same_pos[0].yaxis.get_label_position() == 'left':
-                ax_main, ax_twin = axes_same_pos
-            else:
-                ax_twin, ax_main = axes_same_pos
-        else:
-            ax_main = ax_clicked
-            ax_twin = None
-
         fig = plt.figure(figsize=(8, 6))
         new_ax = fig.add_subplot(111)
 
-        # Copia todas las líneas del eje principal
-        for line in ax_main.get_lines():
-            new_ax.plot(line.get_xdata(), line.get_ydata(),
-                        color=line.get_color(),
-                        linestyle=line.get_linestyle(),
-                        label=line.get_label(),
-                        visible=line.get_visible())
-        new_ax.set_xlabel(ax_main.get_xlabel(), fontsize=9)
-        new_ax.set_ylabel(ax_main.get_ylabel(), fontsize=9)
-        new_ax.set_title(ax_main.get_title() or "Gráfica", fontsize=10, fontweight='bold')
+        # Encuentra todos los ejes que comparten exactamente la misma posición
+        bounds = ax_clicked.get_position().bounds
+        axes_same_pos = [a for a in ax_clicked.figure.axes if np.allclose(a.get_position().bounds, bounds)]
+
+        twin_axes_new = []
+        for i, orig_ax in enumerate(axes_same_pos):
+            if i == 0:
+                target_ax = new_ax
+            else:
+                target_ax = new_ax.twinx()
+                twin_axes_new.append(target_ax)
+
+            for line in orig_ax.get_lines():
+                target_ax.plot(
+                    line.get_xdata(), line.get_ydata(),
+                    color=line.get_color(),
+                    linestyle=line.get_linestyle(),
+                    label=line.get_label(),
+                    visible=line.get_visible()
+                )
+
+            # Copiar ejes
+            ylab = orig_ax.get_ylabel() or "Magnitud"
+            target_ax.set_ylabel(ylab, fontsize=9)
+            target_ax.set_ylim(orig_ax.get_ylim())
+            target_ax.yaxis.label.set_color(target_ax.get_lines()[0].get_color())
+            target_ax.tick_params(axis='y', colors=target_ax.get_lines()[0].get_color())
+
+        # Copiar título y ejes X
+        title = ax_clicked.get_title()
+        if not title:
+            for ax in ax_clicked.figure.axes:
+                if np.allclose(ax.get_position().bounds, bounds) and ax.get_title():
+                    title = ax.get_title()
+                    break
+        if not title:
+            title = "Subplot ampliado"
+
+        new_ax.set_title(title, fontsize=10, fontweight='bold')
+        new_ax.set_xlabel("Frecuencia [Hz]", fontsize=9)
+        new_ax.set_xscale('log')
+        new_ax.set_xlim(ax_clicked.get_xlim())
         new_ax.grid(True, which="both")
-        new_ax.set_xscale(ax_main.get_xscale())
+
+        new_ax.xaxis.set_major_locator(LogLocator(base=10.0))
+        new_ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=10))
+        new_ax.xaxis.set_major_formatter(ScalarFormatter())
         new_ax.tick_params(axis='both', labelsize=8)
-        new_ax.set_xlim(ax_main.get_xlim())
-        new_ax.set_ylim(ax_main.get_ylim())
 
-        new_ax.yaxis.label.set_color(new_ax.get_lines()[0].get_color())
-        new_ax.tick_params(axis='y', colors=new_ax.get_lines()[0].get_color())
-        new_ax.spines['left'].set_color(new_ax.get_lines()[0].get_color())
-        new_ax.xaxis.label.set_color('black')
-        new_ax.tick_params(axis='x', colors='black')
-        new_ax.spines['bottom'].set_color('black')
+        if "SPL" in title:
+            new_ax.yaxis.set_major_locator(MultipleLocator(10))
 
-        leg1 = None
-        leg2 = None
+        # Mostrar leyendas
+        # Mostrar leyenda combinada (una sola leyenda en el eje izquierdo)
+        combined_handles = []
+        combined_labels = []
+        for ax in [new_ax] + twin_axes_new:
+            h, l = ax.get_legend_handles_labels()
+            for handle, label in zip(h, l):
+                if label and label != "_nolegend_":
+                    combined_handles.append(handle)
+                    combined_labels.append(label)
 
-        # Si hay twin, copiar también sus líneas y etiquetas
-        if ax_twin:
-            new_twin = new_ax.twinx()
-            for line in ax_twin.get_lines():
-                new_twin.plot(line.get_xdata(), line.get_ydata(),
-                              color=line.get_color(),
-                              linestyle=line.get_linestyle(),
-                              label=line.get_label(),
-                              visible=line.get_visible())
-            new_twin.set_ylabel(ax_twin.get_ylabel(), fontsize=9)
-            new_twin.yaxis.label.set_color(new_twin.get_lines()[0].get_color())
-            new_twin.tick_params(axis='y', colors=new_twin.get_lines()[0].get_color())
-            new_twin.spines['right'].set_color(new_twin.get_lines()[0].get_color())
-            # Leyendas SIEMPRE creadas y con visibilidad según el estado global
-            handles1, labels1 = new_ax.get_legend_handles_labels()
-            handles2, labels2 = new_twin.get_legend_handles_labels()
-            if handles1:
-                leg1 = new_ax.legend(handles1, labels1, loc="upper left", fontsize=9)
-                leg1.set_visible(self.show_legends)
-            # Fuerza la leyenda del twin aunque matplotlib no la cree automáticamente
-            if handles2 and any(lab != "_nolegend_" for lab in labels2):
-                leg2 = new_twin.legend(handles2, labels2, loc="upper right", fontsize=9)
-                leg2.set_visible(self.show_legends)
-            elif len(new_twin.get_lines()) > 0:
-                # Forzar leyenda si hay líneas pero no labels válidos
-                labs = [l.get_label() for l in new_twin.get_lines()]
-                leg2 = new_twin.legend(new_twin.get_lines(), labs, loc="upper right", fontsize=9)
-                leg2.set_visible(self.show_legends)
-        else:
-            handles, labels = new_ax.get_legend_handles_labels()
-            if handles:
-                leg1 = new_ax.legend(handles, labels, fontsize=9)
-                leg1.set_visible(self.show_legends)
+        if combined_handles:
+            new_ax.legend(combined_handles, combined_labels, loc="upper left", fontsize=9)
 
-        # Escala logarítmica y formato de ticks si corresponde
-        if ax_main.get_xscale() == "log":
-            from matplotlib.ticker import LogLocator, ScalarFormatter
-            new_ax.set_xscale('log')
-            new_ax.xaxis.set_major_locator(LogLocator(base=10.0, numticks=10))
-            new_ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10)*.1, numticks=10))
-            new_ax.xaxis.set_major_formatter(ScalarFormatter())
-            new_ax.tick_params(axis='both', labelsize=8)
 
-        # Cursor interactivo para TODAS las líneas (principal y twin)
-        all_lines = list(new_ax.get_lines())
-        if ax_twin:
-            all_lines += list(new_twin.get_lines())
-        cursor = mplcursors.cursor(all_lines, hover=True)
+        # Cursor interactivo
+        cursor = mplcursors.cursor(fig.axes, hover=True)
+
         def cursor_fmt(sel):
             x = sel.target[0]
             y = sel.target[1]
@@ -494,14 +474,17 @@ class App:
                 y_unit = "(ratio)"
             elif "Excursión" in label:
                 y_unit = "mm"
+            elif "Potencia" in label or "P." in label:
+                y_unit = "W"
             else:
                 y_unit = ""
             sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
+
         cursor.connect("add", cursor_fmt)
 
         fig.tight_layout()
         fig.show()
-
+    
     def on_close(self):
         self.root.destroy()
         sys.exit(0)
