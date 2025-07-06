@@ -381,6 +381,7 @@ class Driver:
     # 7. Respuesta al escalón
     # ===============================
     def step_response(self, t, U=2.83):             # Deriva la respuesta al escalón del sistema
+        #t = np.asarray(t).flatten()  # 🔧 <- Asegura forma (n,)
 
         if not isinstance(t, (list, np.ndarray)):
             raise ValueError("El tiempo t debe ser un array o lista de valores.")
@@ -392,10 +393,6 @@ class Driver:
         Bl = self.Bl                                # Producto flujo-Bobina
 
         num = [Bl * I]                              # Coeficientes del numerador del sistema
-        # if self.Reh:                                # Si Reh está definido, usa el modelo extendido
-        #     num.append(self.Reh * Bl * I)           # Agrega el término de resistencia extendida al numerador
-        # else:
-        #     num.append(0)                           # Si no, agrega un cero al numerador
         den = [self.Mms, self.Rms, 1 / self.Cms]    # Coeficientes del denominador del sistema
         system = lti(num, den)                      # Crea un sistema LTI (Lineal Time-Invariant) con los coeficientes del numerador y denominador
 

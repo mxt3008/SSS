@@ -139,46 +139,43 @@ def plot_all(
 
     # 6. Retardo de grupo
     axs[5].set_title("Retardo de Grupo", fontsize=title_fontsize, fontweight='bold')
-    if group_delay_vals is not None:
-        axs[5].semilogx(frequencies, group_delay_vals, color="b", linestyle=linestyle, label="Retardo de grupo")
-        axs[5].legend(fontsize=label_fontsize)
+    ln11, = axs[5].semilogx(frequencies, group_delay_vals, color="m", linestyle=linestyle, label=f"Velocidad [m/s] - {label}")
+    #axs[5].semilogx(frequencies, group_delay_vals, color="b", linestyle=linestyle, label="Retardo de grupo")
     axs[5].set_ylabel("Tiempo [s]", fontsize=label_fontsize)
     axs[5].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
     axs[5].tick_params(axis='both', labelsize=tick_fontsize)
-    axs[5].grid(True, which="both")
+    axs[5].legend(fontsize=label_fontsize)
+    lines.append(ln11)
 
     # 7. Respuesta al escalón
     axs[6].set_title("Respuesta al Escalón", fontsize=title_fontsize, fontweight='bold')
-    if step_t is not None and step_v is not None:
-        axs[6].plot(step_t, step_v, color="b", linestyle=linestyle, label="Velocidad")
-        axs[6].legend(fontsize=label_fontsize)
+    ln12, = axs[6].semilogx(step_t, step_v, color="m", linestyle=linestyle, label=f"Velocidad [m/s] - {label}")    
     axs[6].set_ylabel("Velocidad [m/s]", fontsize=label_fontsize)
     axs[6].set_xlabel("Tiempo [s]", fontsize=label_fontsize, labelpad=2)
     axs[6].tick_params(axis='both', labelsize=tick_fontsize)
     axs[6].grid(True, which="both")
+    axs[6].legend(fontsize=label_fontsize)
+    lines.append(ln12)
 
     # 8. Eficiencia
     axs[7].set_title("Eficiencia", fontsize=title_fontsize, fontweight='bold')
-    if efficiency_val is not None:
-        axs[7].bar([0.5], [efficiency_val*100], width=0.3, color='orange', label="Eficiencia [%]")
-        axs[7].set_xlim(0, 1)
-        axs[7].set_xticks([])
-        axs[7].legend(fontsize=label_fontsize)
+    ln13, = axs[7].semilogx(frequencies, efficiency_val, color="m", linestyle=linestyle, label=f"Eficiencia [%] - {label}")        
     axs[7].set_ylabel("%", fontsize=label_fontsize)
     axs[7].set_xlabel("", fontsize=label_fontsize)
     axs[7].tick_params(axis='both', labelsize=tick_fontsize)
     axs[7].grid(True, axis='y')
-
+    axs[6].legend(fontsize=label_fontsize)
+    lines.append(ln13)    
 
     # 9. Excursión pico y relación con Xmax
     axs[8].set_title("Excursión pico y Relación con Xmax", fontsize=title_fontsize, fontweight='bold')
-    ln11, = axs[8].semilogx(frequencies, excursions_mm, color="b", linestyle=linestyle, label=f"Excursión [mm] - {label}")
-    ln12, = axs[8].semilogx(frequencies, excursion_ratio, color="g", linestyle=linestyle, label=f"Excursión/Xmax - {label}")
+    ln14, = axs[8].semilogx(frequencies, excursions_mm, color="b", linestyle=linestyle, label=f"Excursión [mm] - {label}")
+    ln15, = axs[8].semilogx(frequencies, excursion_ratio, color="g", linestyle=linestyle, label=f"Excursión/Xmax - {label}")
     hline = axs[8].axhline(1, color="red", linestyle=":", label="Límite Xmax")
     axs[8].legend(fontsize=label_fontsize)
     axs[8].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
     axs[8].tick_params(axis='both', labelsize=tick_fontsize)
-    lines.extend([ln11, ln12])
+    lines.extend([ln14, ln15])
 
     # Ajustes de ejes y formato logarítmico
     custom_ticks = [10, 100, 1000, 10000, 15000, 20000]

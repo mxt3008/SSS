@@ -292,7 +292,7 @@ class App:
         T0 = 1 / self.driver.Fs
         t_array = np.linspace(0, 10 * T0, 1000)
         step_t, step_v = self.driver.step_response(t_array)
-        efficiency_val = self.driver.efficiency() 
+        efficiency_val = ([self.driver.efficiency()  for f in frequencies])
         excursions = velocities / (2 * np.pi * frequencies)
         excursions_mm = excursions * 1000
         excursion_ratio = excursions / self.driver.Xmax
@@ -307,8 +307,8 @@ class App:
         if self.fig is None or self.axs is None or self.canvas is None:
             lines, cursor = plot_all(
                 self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-                displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, step_v, efficiency_val, 
-                excursions_mm, excursion_ratio, f_max,
+                displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, group_delay_vals, step_t, step_v, 
+                efficiency_val, excursions_mm, excursion_ratio, f_max,
                 fig=None, axs=None, linestyle=linestyle, label=nombre_driver,
                 show_legend=self.show_legends,
                 enable_cursor=self.enable_grid_cursor,
@@ -324,8 +324,8 @@ class App:
             # Agrega nuevas líneas a los ejes existentes
             lines, cursor = plot_all(
                 self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-                displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, step_v, efficiency_val, 
-                excursions_mm, excursion_ratio, f_max,
+                displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, group_delay_vals, step_t, step_v, 
+                efficiency_val, excursions_mm, excursion_ratio, f_max,
                 fig=self.fig, axs=self.axs, linestyle=linestyle, label=nombre_driver,
                 show_legend=self.show_legends,
                 enable_cursor=self.enable_grid_cursor,
