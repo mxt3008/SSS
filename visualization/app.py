@@ -284,6 +284,10 @@ class App:
         displacements = np.array([self.driver.displacement(f) for f in frequencies])
         displacements_mm = displacements * 1000
         velocities = np.array([abs(self.driver.velocity(f)) for f in frequencies])
+        P_real = np.array([self.driver.power_real(f) for f in frequencies])
+        P_reactiva = np.array([self.driver.power_reactive(f) for f in frequencies])
+        P_aparente = np.array([self.driver.power_apparent(f) for f in frequencies])
+        P_ac = np.array([self.driver.power_ac(f) for f in frequencies])
         excursions = velocities / (2 * np.pi * frequencies)
         excursions_mm = excursions * 1000
         excursion_ratio = excursions / self.driver.Xmax
@@ -298,7 +302,7 @@ class App:
         if self.fig is None or self.axs is None or self.canvas is None:
             lines, cursor = plot_all(
                 self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-                displacements_mm, velocities, excursions_mm, excursion_ratio, f_max,
+                displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, excursions_mm, excursion_ratio, f_max,
                 fig=None, axs=None, linestyle=linestyle, label=nombre_driver,
                 show_legend=self.show_legends,
                 enable_cursor=self.enable_grid_cursor,
@@ -314,7 +318,7 @@ class App:
             # Agrega nuevas líneas a los ejes existentes
             lines, cursor = plot_all(
                 self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-                displacements_mm, velocities, excursions_mm, excursion_ratio, f_max,
+                displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, excursions_mm, excursion_ratio, f_max,
                 fig=self.fig, axs=self.axs, linestyle=linestyle, label=nombre_driver,
                 show_legend=self.show_legends,
                 enable_cursor=self.enable_grid_cursor,
