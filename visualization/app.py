@@ -291,7 +291,7 @@ class App:
         group_delay_vals = self.driver.group_delay_array(frequencies)
         Fs = abs(self.driver.Fs) if self.driver.Fs != 0 else 1e-6                       # Evita división por cero
         T0 = 1 / Fs
-        t_array = np.linspace(0, 10 * T0, 1000)                                         # 10 ciclos de la frecuencia fundamental
+        t_array = np.linspace(0, 5 * T0, 1000)                                         # 10 ciclos de la frecuencia fundamental
         step_t, step_x, step_v, step_a = self.driver.step_response(t_array)
         efficiency_val = self.driver.efficiency(frequencies)
         excursions = velocities / (2 * np.pi * frequencies)
@@ -438,7 +438,7 @@ class App:
             new_ax.set_xscale('linear')  # o log si así lo prefieres
             new_ax.set_xlim(ax_clicked.get_xlim())
         elif "Escalón" in title or "Step" in title or "Tiempo" in title:
-            new_ax.set_xlabel("Tiempo [s]", fontsize=9)
+            new_ax.set_xlabel("Tiempo [ms]", fontsize=9)
             new_ax.set_xscale('linear')
             new_ax.set_xlim(ax_clicked.get_xlim())
         else:

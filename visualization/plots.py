@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator, FixedLocator, LogLocator
 import matplotlib.ticker as ticker
 from matplotlib.ticker import ScalarFormatter
+from matplotlib.ticker import FuncFormatter
 import matplotlib
 import matplotlib.offsetbox
 
@@ -149,21 +150,27 @@ def plot_all(
     # 7. Respuesta al escalón
     axs[6].clear()  # 🔧 Limpia contenido anterior
     axs[6].set_title("Respuesta al Escalón", fontsize=title_fontsize, fontweight='bold')
-    axs[6].set_xlabel("Tiempo [s]", fontsize=label_fontsize)
-    axs[6].set_xlim(min(step_t), max(step_t))
+    axs[6].set_xlabel("Tiempo [ms]", fontsize=label_fontsize)
+    axs[6].set_xlim(min(step_t*1000), max(step_t*1000))
     axs[6].set_ylim(auto=True)  # Ajusta automáticamente el límite Y
     axs[6].autoscale(enable=True, axis='y')
     axs[6].grid(True, which="both")
     axs[6].tick_params(axis='both', labelsize=tick_fontsize)
 
+    formatter = FuncFormatter(lambda x, _: f"{x*1000:.0f} ms")
+    axs[6].xaxis.set_major_formatter(formatter)
+    axs[6].xaxis.set_major_locator(MultipleLocator(0.02))  # Ejemplo: cada 20 ms
+    #axs[6].ticklabel_format(style='plain', axis='x')
+    print("Formatter aplicado:", axs[6].xaxis.get_major_formatter())
+
     axs[6].set_ylabel("Desplazamiento [mm]", fontsize=label_fontsize, color="b")
-    ln_disp, = axs[6].plot(step_t, step_x, color="b", linestyle=linestyle, label=f"Desplazamiento [mm] - {label}")
+    ln_disp, = axs[6].plot(step_t*1000, step_x, color="b", linestyle=linestyle, label=f"Desplazamiento [mm] - {label}")
     ln_disp.set_gid("Desplazamiento [mm]")
     axs[6].tick_params(axis='y', labelcolor="b")
 
     ax_vel = axs[6].twinx()
     ax_vel.set_ylabel("Velocidad [mm/s]", fontsize=label_fontsize, color="g")
-    ln_vel, = ax_vel.plot(step_t, step_v, color="g", linestyle=linestyle, label=f"Velocidad [mm/s] - {label}")
+    ln_vel, = ax_vel.plot(step_t*1000, step_v, color="g", linestyle=linestyle, label=f"Velocidad [mm/s] - {label}")
     ln_vel.set_gid("Velocidad [mm/s]")
     ax_vel.tick_params(axis='y', labelcolor="g")
 
@@ -172,7 +179,7 @@ def plot_all(
     ax_acc.set_frame_on(True)
     ax_acc.patch.set_visible(False)  # Oculta fondo
     ax_acc.set_ylabel("Aceleración [mm/s²]", fontsize=label_fontsize, color="r")
-    ln_acc, = ax_acc.plot(step_t, step_a, color="r", linestyle=linestyle, label=f"Aceleración [mm/s²] - {label}")
+    ln_acc, = ax_acc.plot(step_t*1000, step_a, color="r", linestyle=linestyle, label=f"Aceleración [mm/s²] - {label}")
     ln_acc.set_gid("Aceleración [mm/s²]")
     ax_acc.tick_params(axis='y', labelcolor="r")
 
@@ -405,3 +412,4 @@ def maximize_subplot(self, event):
     cursor.connect("add", cursor_fmt)
     fig.tight_layout()
     fig.show()
+    fig.canvas.draw_idle()

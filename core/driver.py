@@ -412,11 +412,6 @@ class Driver:
         v_out_mm = v_out * 1000                     # Convierte velocidad a mm/s
         a_out_mm = a_out * 1000                     # Convierte aceleración a mm/s²
 
-        print(f"Máx vel: {np.max(v_out_mm):.3f} mm/s")
-        print(f"Máx desp: {np.max(x_out_mm):.3f} mm")
-        print(f"Máx acel: {np.max(a_out_mm):.3f} mm/s²")
-
-
         return t_out, x_out_mm, v_out_mm, a_out_mm  # Retorna tiempo, desplazamiento, velocidad y aceleración en mm
 
 #====================================================================================================================================
