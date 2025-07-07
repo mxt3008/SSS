@@ -9,8 +9,8 @@ import matplotlib.offsetbox
 
 def plot_all(
     my_driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-    displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, excursions_mm, 
-    group_delay_vals, step_t, step_x, step_v, step_a, efficiency_val, excursion_ratio, f_max,
+    displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, 
+    group_delay_vals, step_t, step_x, step_v, step_a, efficiency_val, excursions_mm, excursion_ratio, f_max,
     fig=None, axs=None, linestyle="-", label="Simulación", show_legend=True,
     enable_cursor=False,
     grid_cursor=None
@@ -140,8 +140,8 @@ def plot_all(
 
     # 6. Retardo de grupo
     axs[5].set_title("Retardo de Grupo", fontsize=title_fontsize, fontweight='bold')
-    ln11, = axs[5].semilogx(frequencies, group_delay_vals, color="m", linestyle=linestyle, label=f"Velocidad [m/s] - {label}")
-    axs[5].set_ylabel("Tiempo [s]", fontsize=label_fontsize)
+    ln11, = axs[5].semilogx(frequencies, group_delay_vals*1000, color="m", linestyle=linestyle, label=f"Retardo de Grupo - {label}")
+    axs[5].set_ylabel("Tiempo [ms]", fontsize=label_fontsize)
     axs[5].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
     axs[5].tick_params(axis='both', labelsize=tick_fontsize)
     axs[5].legend(fontsize=label_fontsize)
@@ -160,8 +160,6 @@ def plot_all(
     formatter = FuncFormatter(lambda x, _: f"{x*1000:.0f} ms")
     axs[6].xaxis.set_major_formatter(formatter)
     axs[6].xaxis.set_major_locator(MultipleLocator(0.02))  # Ejemplo: cada 20 ms
-    #axs[6].ticklabel_format(style='plain', axis='x')
-    print("Formatter aplicado:", axs[6].xaxis.get_major_formatter())
 
     axs[6].set_ylabel("Desplazamiento [mm]", fontsize=label_fontsize, color="b")
     ln_disp, = axs[6].plot(step_t*1000, step_x, color="b", linestyle=linestyle, label=f"Desplazamiento [mm] - {label}")

@@ -288,7 +288,7 @@ class App:
         P_reactiva = np.array([self.driver.power_reactive(f) for f in frequencies])
         P_aparente = np.array([self.driver.power_apparent(f) for f in frequencies])
         P_ac = np.array([self.driver.power_ac(f) for f in frequencies])
-        group_delay_vals = self.driver.group_delay_array(frequencies)
+        group_delay_vals = -self.driver.group_delay_array(frequencies)
         Fs = abs(self.driver.Fs) if self.driver.Fs != 0 else 1e-6                       # Evita división por cero
         T0 = 1 / Fs
         t_array = np.linspace(0, 5 * T0, 1000)                                         # 10 ciclos de la frecuencia fundamental

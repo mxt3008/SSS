@@ -364,19 +364,58 @@ class Driver:
     # ===============================
     # 6. Retardo de grupo
     # ===============================
-    def group_delay_array(self, frequencies):       # Deriva el retardo de grupo para un array de frecuencias
-        
+
+    def spl_complex(self, f, U=2.83):
+        """
+        Función de transferencia compleja para cálculo de retardo de grupo.
+        Usa desplazamiento del diafragma (posición) como H(f), como en VituixCAD.
+        """
+        v = self.velocity(f, U)
+        return self.radiation_pressure(v, f)
+
+    def radiation_pressure(self, v, f):
+        rho = self.rho0
+        c = self.c
+        Sd = self.Sd
+        r = 1.0
+        k = 2 * np.pi * f / c
+        return rho * c * Sd * v * np.exp(-1j * k * r) / (4 * np.pi * r)
+ 
+    def group_delay_array(self, frequencies, U=2.83):
         if not isinstance(frequencies, (list, np.ndarray)):
             raise ValueError("Las frecuencias deben ser un array o lista de valores.")
         if len(frequencies) == 0:
             raise ValueError("El array de frecuencias no puede estar vacío.")
-        
-        omega = 2 * np.pi * frequencies             # Frecuencia angular
-        Z_array = np.array([self.impedance(f) for f in frequencies])
-        phase = np.unwrap(np.angle(Z_array))        # Fase de la impedancia, sin discontinuidades
-        dphi_domega = np.gradient(phase, omega)     # Derivada de la fase respecto a la frecuencia angular
-        return -dphi_domega                         # En segundos
 
+        H_array = np.array([self.spl_complex(f, U) for f in frequencies])
+        phase = np.unwrap(np.angle(H_array))
+        dphi_df = np.gradient(phase, frequencies)
+        dphi_domega = -dphi_df / (2 * np.pi)
+
+        # import matplotlib.pyplot as plt
+        # plt.figure(figsize=(12, 8))
+
+        # plt.subplot(3, 1, 1)
+        # plt.semilogx(frequencies, 20 * np.log10(np.abs(H_array)))
+        # plt.title("Magnitud de H(f)")
+        # plt.ylabel("Magnitud [dB]")
+        # plt.grid(True, which="both")
+
+        # plt.subplot(3, 1, 2)
+        # plt.semilogx(frequencies, np.angle(H_array, deg=True))
+        # plt.ylabel("Fase [°]")
+        # plt.grid(True, which="both")
+
+        # plt.subplot(3, 1, 3)
+        # plt.semilogx(frequencies, dphi_domega * 1000)
+        # plt.ylabel("Retardo de grupo [ms]")
+        # plt.xlabel("Frecuencia [Hz]")
+        # plt.grid(True, which="both")
+        # plt.tight_layout()
+        # plt.show()
+
+        return -dphi_domega  # En segundos
+    
 #====================================================================================================================================
     # ===============================
     # 7. Respuesta al escalón
@@ -432,7 +471,9 @@ class Driver:
             eta = np.where(Pel > 0, (Pac / Pel) * 100, 0)  # En porcentaje
 
         return eta
+    
 #====================================================================================================================================
     # ===============================
     # 9. Excursión máxima
     # ===============================
+    
