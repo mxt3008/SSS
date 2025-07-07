@@ -95,26 +95,26 @@ class Driver:
         =======================================
 
         Parámetros primarios:
-        Fs    = {self.Fs:.2f} Hz         (Frecuencia de resonancia)
-        Re    = {self.Re:.3f} Ohm        (Resistencia DC)
-        Le    = {self.Le*1e3:.3f} mH     (Inductancia)
-        Bl    = {self.Bl:.3f} T·m        (Factor motor)
-        Sd    = {self.Sd*1e4:.2f} cm²    (Área efectiva del diafragma)
-        Vas   = {self.Vas:.2f} L         (Volumen de aire equivalente)
-        Qts   = {self.Qts:.3f}           (Factor de calidad total)
-        Qes   = {self.Qes:.3f}           (Factor de calidad eléctrico)
-        Qms   = {self.Qms():.3f}         (Factor de calidad mecánico)
-        Xmax  = {self.Xmax*1e3:.2f} mm   (Excursión máxima lineal)
+        Fs   = {self.Fs:.2f} Hz    (Frecuencia de resonancia)
+        Re   = {self.Re:.3f} Ohm   (Resistencia DC)
+        Le   = {self.Le*1e3:.3f} mH    (Inductancia)
+        Bl   = {self.Bl:.3f} T·m  (Factor motor)
+        Sd   = {self.Sd*1e4:.2f} cm²  (Área efectiva del diafragma)
+        Vas  = {self.Vas:.2f} L     (Volumen de aire equivalente)
+        Qts  = {self.Qts:.3f}       (Factor de calidad total)
+        Qes  = {self.Qes:.3f}       (Factor de calidad eléctrico)
+        Qms  = {self.Qms():.3f}       (Factor de calidad mecánico)
+        Xmax = {self.Xmax:.3f} mm    (Excursión máxima lineal)
 
         Parámetros derivados:
-        Mms   = {self.Mms*1e3:.3f} g     (Masa móvil)
-        Cms   = {self.Cms*1e3:.3f} mm/N  (Compliancia)
-        Kms   = {self.Kms:.3f} N/m       (Rigidez mecánica)
-        Rms   = {self.Rms:.5f} kg/s      (Resistencia mecánica)
+        Mms  = {self.Mms*1e3:.3f} g    (Masa móvil)
+        Cms  = {self.Cms*1e3:.3f} mm/N  (Compliancia)
+        Kms  = {self.Kms:.2f} N/m (Rigidez mecánica)
+        Rms  = {self.Rms:.4f} kg/s (Resistencia mecánica)
 
         Constantes físicas:
-        rho0  = {self.rho0:.3f} kg/m³    (Densidad del aire)
-        c     = {self.c:.2f} m/s         (Velocidad del sonido)
+        rho0 = {self.rho0:.3f} kg/m³ (Densidad del aire)
+        c    = {self.c:.2f} m/s  (Velocidad del sonido)
 
         =======================================
         """)

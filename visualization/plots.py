@@ -38,9 +38,14 @@ def plot_all(
         #plot_all._twin_axes[4] = axs[4].twinx()  # Para potencias eléctricas/acústica
     else:
         axs = axs.flatten()
+        # Reforzar escala log en cada llamada para subplots de frecuencia
+    for i in [0, 1, 2, 3, 4, 5, 7, 8]:
+        axs[i].set_xscale('log', nonpositive='clip')
+
 
     twin0 = plot_all._twin_axes[0]
     twin1 = plot_all._twin_axes[1]
+    
 
     lines = []
 
@@ -382,7 +387,7 @@ def maximize_subplot(self, event):
         new_ax.yaxis.set_major_locator(MultipleLocator(10))
 
     cursor = mplcursors.cursor(new_ax.get_lines(), hover=True)
-    
+
     def cursor_fmt(sel):
         x = sel.target[0]
         y = sel.target[1]
