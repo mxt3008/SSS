@@ -9,7 +9,7 @@ import matplotlib.offsetbox
 def plot_all(
     my_driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
     displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, excursions_mm, 
-    group_delay_vals, step_t, step_v, efficiency_val, excursion_ratio, f_max,
+    group_delay_vals, step_t, step_x, step_v, step_a, efficiency_val, excursion_ratio, f_max,
     fig=None, axs=None, linestyle="-", label="Simulación", show_legend=True,
     enable_cursor=False,
     grid_cursor=None
@@ -140,7 +140,6 @@ def plot_all(
     # 6. Retardo de grupo
     axs[5].set_title("Retardo de Grupo", fontsize=title_fontsize, fontweight='bold')
     ln11, = axs[5].semilogx(frequencies, group_delay_vals, color="m", linestyle=linestyle, label=f"Velocidad [m/s] - {label}")
-    #axs[5].semilogx(frequencies, group_delay_vals, color="b", linestyle=linestyle, label="Retardo de grupo")
     axs[5].set_ylabel("Tiempo [s]", fontsize=label_fontsize)
     axs[5].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
     axs[5].tick_params(axis='both', labelsize=tick_fontsize)
@@ -148,20 +147,43 @@ def plot_all(
     lines.append(ln11)
 
     # 7. Respuesta al escalón
+    axs[6].clear()  # 🔧 Limpia contenido anterior
     axs[6].set_title("Respuesta al Escalón", fontsize=title_fontsize, fontweight='bold')
-    ln12, = axs[6].semilogx(step_t, step_v, color="m", linestyle=linestyle, label=f"Velocidad [m/s] - {label}")    
-    axs[6].set_ylabel("Velocidad [m/s]", fontsize=label_fontsize)
-    axs[6].set_xlabel("Tiempo [s]", fontsize=label_fontsize, labelpad=2)
-    axs[6].tick_params(axis='both', labelsize=tick_fontsize)
+    axs[6].set_xlabel("Tiempo [s]", fontsize=label_fontsize)
+    axs[6].set_xlim(min(step_t), max(step_t))
+    axs[6].set_ylim(auto=True)  # Ajusta automáticamente el límite Y
+    axs[6].autoscale(enable=True, axis='y')
     axs[6].grid(True, which="both")
-    axs[6].legend(fontsize=label_fontsize)
-    lines.append(ln12)
+    axs[6].tick_params(axis='both', labelsize=tick_fontsize)
+
+    axs[6].set_ylabel("Desplazamiento [mm]", fontsize=label_fontsize, color="b")
+    ln_disp, = axs[6].plot(step_t, step_x, color="b", linestyle=linestyle, label=f"Desplazamiento [mm] - {label}")
+    axs[6].tick_params(axis='y', labelcolor="b")
+
+    ax_vel = axs[6].twinx()
+    ax_vel.set_ylabel("Velocidad [mm/s]", fontsize=label_fontsize, color="g")
+    ln_vel, = ax_vel.plot(step_t, step_v, color="g", linestyle=linestyle, label=f"Velocidad [mm/s] - {label}")
+    ax_vel.tick_params(axis='y', labelcolor="g")
+
+    ax_acc = axs[6].twinx()
+    ax_acc.spines["right"].set_position(("axes", 1.15))  # Mueve este eje más a la derecha
+    ax_acc.set_frame_on(True)
+    ax_acc.patch.set_visible(False)  # Oculta fondo
+    ax_acc.set_ylabel("Aceleración [mm/s²]", fontsize=label_fontsize, color="r")
+    ln_acc, = ax_acc.plot(step_t, step_a, color="r", linestyle=linestyle, label=f"Aceleración [mm/s²] - {label}")
+    ax_acc.tick_params(axis='y', labelcolor="r")
+
+    lines_step = [ln_disp, ln_vel, ln_acc]
+    labels_step = [l.get_label() for l in lines_step]
+    axs[6].legend(lines_step, labels_step, fontsize=label_fontsize, loc="upper right")
+
+    lines.extend(lines_step)
 
     # 8. Eficiencia
     axs[7].set_title("Eficiencia", fontsize=title_fontsize, fontweight='bold')
     ln13, = axs[7].semilogx(frequencies, efficiency_val, color="m", linestyle=linestyle, label=f"Eficiencia [%] - {label}")        
-    axs[7].set_ylabel("%", fontsize=label_fontsize)
-    axs[7].set_xlabel("", fontsize=label_fontsize)
+    axs[7].set_ylabel("Eficiencia [%]", fontsize=label_fontsize)
+    axs[7].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize)
     axs[7].tick_params(axis='both', labelsize=tick_fontsize)
     axs[7].grid(True, axis='y')
     axs[6].legend(fontsize=label_fontsize)
@@ -184,13 +206,19 @@ def plot_all(
             return "0"
         return f"{x/1000:.0f}k" if x >= 1000 else f"{x:.0f}"
     for i, ax in enumerate(axs.flat):
-        ax.set_xscale('log')
-        ax.set_xlim([10, (f_max*1.1)])
-        ax.xaxis.set_major_locator(FixedLocator(custom_ticks))
-        ax.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
-        ax.xaxis.set_major_formatter(ticker.FuncFormatter(fmt_ticks))
-        if i not in [0, 1]:  # Solo activa el grid en los que NO tienen twin
+        if i in [0, 1, 2, 3, 4, 5, 8]:  # Subplots que tienen eje X en frecuencia
+            ax.set_xscale('log')
+            ax.set_xlim([10, (f_max*1.1)])
+            ax.xaxis.set_major_locator(FixedLocator(custom_ticks))
+            ax.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
+            ax.xaxis.set_major_formatter(ticker.FuncFormatter(fmt_ticks))
+        else:
+            ax.set_xscale('linear')  # Subplots de tiempo, como la respuesta al escalón
+            ax.set_xlim(auto=True)
+
+        if i not in [0, 1]:
             ax.grid(True, which="both")
+
 
     # Limpieza robusta de anotaciones y bbox
     def clean_annotations(fig):
@@ -343,8 +371,14 @@ def maximize_subplot(self, event):
         y = sel.target[1]
         x_label = f"{x/1000:.1f}k" if x >= 1000 else f"{x:.0f}"
         label = sel.artist.get_label()
-        if "∠Z" in label or "Phase" in label or "Fase" in label:
-            y_unit = "°"
+        if "Escalón" in label or "Escalón" in title or "Step" in label or "Tiempo" in label:
+            x_unit = "s"
+            y_unit = "mm"
+        elif "Eficiencia" in label:
+            x_unit = "Hz"
+            y_unit = "%"
+        elif "∠Z" in label or "Phase" in label or "Fase" in label:
+            x_unit = "Hz"
         elif "|Z|" in label:
             y_unit = "Ω"
         elif "SPL" in label:
@@ -353,12 +387,17 @@ def maximize_subplot(self, event):
             y_unit = "mm"
         elif "Velocidad" in label:
             y_unit = "m/s"
+        elif "Aceleración" in label:
+            y_unit = "m/s²"
         elif "Excursión/Xmax" in label:
             y_unit = "(ratio)"
         elif "Excursión" in label:
             y_unit = "mm"
+        elif "Potencia" in label or "P." in label:
+            y_unit = "W"
         else:
             y_unit = ""
+            sel.annotation.set_text(f"X: {x:.2f} {x_unit}\nY: {y:.2f} {y_unit}")
         sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
     cursor.connect("add", cursor_fmt)
     fig.tight_layout()

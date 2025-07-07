@@ -5,6 +5,7 @@
 import numpy as np                          # Importa numpy para cálculos matemáticos complejos
 from scipy.special import j1                # Importa la función Bessel de primer orden para cálculos de SPL - Directividad del pistón
 from scipy.signal import lti, step          # Importa lti y step para simular la respuesta al escalón del sistema
+from scipy.signal import savgol_filter      # Importa savgol_filter para suavizar la respuesta al escalón
 import textwrap
 
 class Driver:
@@ -380,35 +381,62 @@ class Driver:
     # ===============================
     # 7. Respuesta al escalón
     # ===============================
-    def step_response(self, t, U=2.83):             # Deriva la respuesta al escalón del sistema
-        #t = np.asarray(t).flatten()  # 🔧 <- Asegura forma (n,)
-
+    def step_response(self, t, U=2.83):
         if not isinstance(t, (list, np.ndarray)):
             raise ValueError("El tiempo t debe ser un array o lista de valores.")
         if len(t) == 0:
             raise ValueError("El array de tiempo no puede estar vacío.")
         
+        t = np.asarray(t)
+        t = np.sort(t)  # Asegura orden creciente
+
         Re = self.Re                                # Resistencia DC de la bobina
-        I = U / Re                                  # Corriente inducida en la bobina a partir del voltaje U
+        I = U / Re                                  # Corriente inducida en la bobina a partir del voltaje RMS U
         Bl = self.Bl                                # Producto flujo-Bobina
+        Mms = self.Mms                              # Masa móvil del driver
+        Rms = self.Rms                              # Resistencia mecánica del driver
+        Cms = self.Cms                              # Compliancia mecánica del driver
 
-        num = [Bl * I]                              # Coeficientes del numerador del sistema
-        den = [self.Mms, self.Rms, 1 / self.Cms]    # Coeficientes del denominador del sistema
-        system = lti(num, den)                      # Crea un sistema LTI (Lineal Time-Invariant) con los coeficientes del numerador y denominador
+        num = [Bl * I / Mms]                        # Numerador de la función de transferencia
+        den = [1, Rms / Mms, 1 / (Mms * Cms)]       # Denominador de la función de transferencia
+        system = lti(num, den)                      # Crea un sistema LTI (Linear Time-Invariant) con el numerador y denominador
+        output = system.step(T=t)  # Simula la respuesta al escalón del sistema LTI
+        t_out, v_out = output            # Simula la respuesta al escalón del sistema LTI
 
-        t_out, v_out = step(system, T=t)            # Simula la respuesta al escalón del sistema LTI en el tiempo t
-        return t_out, v_out                         # Retorna el tiempo y la salida del sistema (desplazamiento del pistón)
-    
+        x_out = np.cumsum(v_out) * (t_out[1] - t_out[0])    # Integra la velocidad para obtener desplazamiento [m]
+        dt = t_out[1] - t_out[0]
+        v_smooth = savgol_filter(v_out, window_length=51, polyorder=3, mode='interp')
+        a_out = np.gradient(v_smooth, dt)              # Deriva la aceleración a partir de la velocidad [m/s²]
+
+        x_out_mm = x_out * 1000                     # Convierte desplazamiento a mm
+        v_out_mm = v_out * 1000                     # Convierte velocidad a mm/s
+        a_out_mm = a_out * 1000                     # Convierte aceleración a mm/s²
+
+        print(f"Máx vel: {np.max(v_out_mm):.3f} mm/s")
+        print(f"Máx desp: {np.max(x_out_mm):.3f} mm")
+        print(f"Máx acel: {np.max(a_out_mm):.3f} mm/s²")
+
+
+        return t_out, x_out_mm, v_out_mm, a_out_mm  # Retorna tiempo, desplazamiento, velocidad y aceleración en mm
+
 #====================================================================================================================================
     # ===============================
     # 8. Eficiencia del driver
     # ===============================
     
-    def efficiency(self):                                               # Deriva la eficiencia del driver
-        w0 = 2 * np.pi * self.Fs
-        eta0 = (self.Bl ** 2) / (self.Re * self.rho0 * self.c ** 3 * self.Sd)
-        return eta0
-    
+    def efficiency(self, frequencies):                                               # Deriva la eficiencia del driver
+        if not isinstance(frequencies, (list, np.ndarray)):
+            raise ValueError("Las frecuencias deben ser un array o lista de valores.")
+        if len(frequencies) == 0:
+            raise ValueError("El array de frecuencias no puede estar vacío.")
+
+        Pac = np.array([self.power_ac(f) for f in frequencies])
+        Pel = np.array([self.power_real(f) for f in frequencies])
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            eta = np.where(Pel > 0, (Pac / Pel) * 100, 0)  # En porcentaje
+
+        return eta
 #====================================================================================================================================
     # ===============================
     # 9. Excursión máxima

@@ -289,10 +289,11 @@ class App:
         P_aparente = np.array([self.driver.power_apparent(f) for f in frequencies])
         P_ac = np.array([self.driver.power_ac(f) for f in frequencies])
         group_delay_vals = self.driver.group_delay_array(frequencies)
-        T0 = 1 / self.driver.Fs
-        t_array = np.linspace(0, 10 * T0, 1000)
-        step_t, step_v = self.driver.step_response(t_array)
-        efficiency_val = ([self.driver.efficiency()  for f in frequencies])
+        Fs = abs(self.driver.Fs) if self.driver.Fs != 0 else 1e-6                       # Evita división por cero
+        T0 = 1 / Fs
+        t_array = np.linspace(0, 10 * T0, 1000)                                         # 10 ciclos de la frecuencia fundamental
+        step_t, step_x, step_v, step_a = self.driver.step_response(t_array)
+        efficiency_val = self.driver.efficiency(frequencies)
         excursions = velocities / (2 * np.pi * frequencies)
         excursions_mm = excursions * 1000
         excursion_ratio = excursions / self.driver.Xmax
@@ -307,8 +308,8 @@ class App:
         if self.fig is None or self.axs is None or self.canvas is None:
             lines, cursor = plot_all(
                 self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-                displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, group_delay_vals, step_t, step_v, 
-                efficiency_val, excursions_mm, excursion_ratio, f_max,
+                displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, group_delay_vals, step_t, step_x, step_v, 
+                step_a, efficiency_val, excursions_mm, excursion_ratio, f_max,
                 fig=None, axs=None, linestyle=linestyle, label=nombre_driver,
                 show_legend=self.show_legends,
                 enable_cursor=self.enable_grid_cursor,
@@ -324,8 +325,8 @@ class App:
             # Agrega nuevas líneas a los ejes existentes
             lines, cursor = plot_all(
                 self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-                displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, group_delay_vals, step_t, step_v, 
-                efficiency_val, excursions_mm, excursion_ratio, f_max,
+                displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, group_delay_vals, step_t, step_x, step_v, 
+                step_a, efficiency_val, excursions_mm, excursion_ratio, f_max,
                 fig=self.fig, axs=self.axs, linestyle=linestyle, label=nombre_driver,
                 show_legend=self.show_legends,
                 enable_cursor=self.enable_grid_cursor,
@@ -431,20 +432,31 @@ class App:
             title = "Subplot ampliado"
 
         new_ax.set_title(title, fontsize=10, fontweight='bold')
-        new_ax.set_xlabel("Frecuencia [Hz]", fontsize=9)
-        new_ax.set_xscale('log')
-        new_ax.set_xlim(ax_clicked.get_xlim())
+
+        if "Eficiencia" in title:
+            new_ax.set_xlabel("Frecuencia [Hz]", fontsize=9)
+            new_ax.set_xscale('linear')  # o log si así lo prefieres
+            new_ax.set_xlim(ax_clicked.get_xlim())
+        elif "Escalón" in title or "Step" in title or "Tiempo" in title:
+            new_ax.set_xlabel("Tiempo [s]", fontsize=9)
+            new_ax.set_xscale('linear')
+            new_ax.set_xlim(ax_clicked.get_xlim())
+        else:
+            new_ax.set_xlabel("Frecuencia [Hz]", fontsize=9)
+            new_ax.set_xscale('log')
+            new_ax.set_xlim(ax_clicked.get_xlim())
         new_ax.grid(True, which="both")
 
-        new_ax.xaxis.set_major_locator(LogLocator(base=10.0))
-        new_ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=10))
-        new_ax.xaxis.set_major_formatter(ScalarFormatter())
+        if new_ax.get_xscale() == "log":
+            new_ax.xaxis.set_major_locator(LogLocator(base=10.0))
+            new_ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=10))
+            new_ax.xaxis.set_major_formatter(ScalarFormatter())
+            
         new_ax.tick_params(axis='both', labelsize=8)
 
         if "SPL" in title:
             new_ax.yaxis.set_major_locator(MultipleLocator(10))
 
-        # Mostrar leyendas
         # Mostrar leyenda combinada (una sola leyenda en el eje izquierdo)
         combined_handles = []
         combined_labels = []
@@ -467,8 +479,18 @@ class App:
             y = sel.target[1]
             x_label = f"{x/1000:.1f}k" if x >= 1000 else f"{x:.0f}"
             label = sel.artist.get_label()
-            if "∠Z" in label or "Phase" in label or "Fase" in label:
-                y_unit = "°"
+
+            x_unit = "Hz"
+            y_unit = "" 
+
+            if "Escalón" in label or "Escalón" in title or "Step" in label or "Tiempo" in label:
+                x_unit = "s"
+                y_unit = "mm"
+            elif "Eficiencia" in label:
+                x_unit = "Hz"
+                y_unit = "%"
+            elif "∠Z" in label or "Phase" in label or "Fase" in label:
+                x_unit = "Hz"
             elif "|Z|" in label:
                 y_unit = "Ω"
             elif "SPL" in label:
@@ -477,6 +499,8 @@ class App:
                 y_unit = "mm"
             elif "Velocidad" in label:
                 y_unit = "m/s"
+            elif "Aceleración" in label:
+                y_unit = "m/s²"
             elif "Excursión/Xmax" in label:
                 y_unit = "(ratio)"
             elif "Excursión" in label:
@@ -485,7 +509,7 @@ class App:
                 y_unit = "W"
             else:
                 y_unit = ""
-            sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
+            sel.annotation.set_text(f"X: {x:.2f} {x_unit}\nY: {y:.2f} {y_unit}")
 
         cursor.connect("add", cursor_fmt)
 
