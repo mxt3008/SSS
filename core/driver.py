@@ -13,7 +13,13 @@ import textwrap
 #====================================================================================================================================
 
 class Driver:  
-    def __init__(self, params):
+    def __init__(self, params, enclosure=None):
+
+        # -------------------------------
+        # Parámetros del enclosure
+        # -------------------------------
+        
+        self.enclosure = enclosure                      # Caja acústica asociada
 
         # -------------------------------
         # Parámetros principales

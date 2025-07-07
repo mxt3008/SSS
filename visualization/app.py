@@ -1,3 +1,8 @@
+# --------------------------------------------
+# app.py
+# Script principal para simular y analizar el comportamiento de un parlante.
+# --------------------------------------------
+
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -54,11 +59,12 @@ class App:
 
         # --- PanedWindow vertical para el panel izquierdo ---
         self.v_paned = tk.PanedWindow(self.h_paned, orient=tk.VERTICAL, sashrelief=tk.RAISED)
-        self.h_paned.add(self.v_paned, minsize=350)
+        self.h_paned.add(self.v_paned, minsize=450)
 
         # --- Frame para formulario (arriba) ---
         self.form_frame = tk.LabelFrame(self.v_paned, text="Selección e ingreso de parámetros")
-        self.v_paned.add(self.form_frame, minsize=180)
+        self.v_paned.add(self.form_frame, minsize=350)
+        self.v_paned.paneconfigure(self.form_frame, minsize=300, stretch='always')
 
         tk.Label(self.form_frame, text="Información del Driver", font=("Arial", 10, "bold")).pack(anchor="w", pady=(5, 0))  # <-- menos espacio abajo
 
@@ -80,21 +86,63 @@ class App:
             self.form_canvas.itemconfig(self.form_window_id, width=event.width)
         self.form_canvas.bind("<Configure>", _on_form_canvas_configure)
 
+#====================================================================================================================================
+
         # --- Entradas del formulario dentro de form_container ---
         self.entries = {}
         row = 0
-        # Etiqueta encima del Entry para el nombre del driver
-        tk.Label(self.form_container, text="Nombre del driver:").grid(row=row, column=0, columnspan=3, sticky="w", padx=5, pady=(5, 0))
+
+        # -------------------------------
+        # Columna izquierda: Nombre
+        # -------------------------------
+        tk.Label(self.form_container, text="Nombre de la simulación:", font=("Arial", 9, "bold")).grid(
+            row=row, column=0, columnspan=3, sticky="w", padx=5, pady=(5, 0)
+        )
+        tk.Label(self.form_container, text="Configuración del Recinto:", font=("Arial", 9, "bold")).grid(
+            row=row, column=3, columnspan=4, sticky="w", padx=10, pady=(5, 0)
+        )
         row += 1
+
+        # Campo de nombre (columna izquierda)
         self.name_var = tk.StringVar()
-        tk.Entry(self.form_container, textvariable=self.name_var, width=16).grid(row=row, column=0, columnspan=3, padx=5, pady=(0, 4), sticky="w")
+        self.name_entry = tk.Entry(self.form_container, textvariable=self.name_var, width=20)
+        self.name_entry.grid(row=row, column=0, columnspan=3, sticky="w", padx=5, pady=2)
+
+        # Menú desplegable + Vb en la misma fila
+        self.enclosure_type_var = tk.StringVar(value="Infinite Baffle")
+        enclosure_options = ["Infinite Baffle", "Caja Sellada", "Bass-reflex"]
+        self.enclosure_menu = tk.OptionMenu(self.form_container, self.enclosure_type_var, *enclosure_options)
+        self.enclosure_menu.grid(row=row, column=3, columnspan=2, sticky="w", padx=5, pady=2)
+
+        self.vb_label = tk.Label(self.form_container, text="Vb [L]:")
+        self.vb_label.grid(row=row, column=5, sticky="e", padx=5, pady=2)
+
+        self.vb_entry = tk.Entry(self.form_container, width=8)
+        self.vb_entry.insert(0, "20")
+        self.vb_entry.grid(row=row, column=6, padx=5, pady=2, sticky="w")
+
         row += 1
+
+        # Mostrar/ocultar Vb según selección
+        def update_enclosure_fields(*args):
+            selected = self.enclosure_type_var.get()
+            if selected == "Caja Sellada":
+                self.vb_label.grid()
+                self.vb_entry.grid()
+            else:
+                self.vb_label.grid_remove()
+                self.vb_entry.grid_remove()
+
+        self.enclosure_type_var.trace_add("write", update_enclosure_fields)
+        update_enclosure_fields()  # Llama una vez al inicio para aplicar lógica inicial
 
         # Subtítulo antes de los parámetros
         tk.Label(self.form_container, text="Parámetros:", font=("Arial", 10, "bold")).grid(
-            row=row, column=0, columnspan=3, sticky="w", padx=5, pady=(0, 4)
+            row=row, column=0, columnspan=2, sticky="w", padx=5, pady=(0, 4)
         )
+
         row += 1
+
 
         for key in self.params:
             unidad = self.units.get(key, "")
@@ -108,11 +156,13 @@ class App:
             self.entries[key] = entry
             row += 1
 
-        self.form_container.grid_columnconfigure(1, weight=0)  # No expandir
+        self.form_container.grid_columnconfigure(1, weight=0)  # Driver params
+        self.form_container.grid_columnconfigure(4, weight=0)  # Enclosure params
 
         # --- Frame para resumen (abajo del formulario) ---
         self.resumen_frame = tk.LabelFrame(self.v_paned, text="Resumen de parámetros EMA - TS")
-        self.v_paned.add(self.resumen_frame, minsize=120)
+        self.v_paned.add(self.resumen_frame, minsize=100)
+        self.v_paned.paneconfigure(self.resumen_frame, minsize=100, stretch='never')
         tk.Label(self.resumen_frame, text="Resumen", font=("Arial", 10, "bold")).pack(anchor="w", pady=(5, 0))
 
         self.resumen_text = tk.Text(self.resumen_frame, width=40, state="disabled", wrap="word", height=8)
@@ -124,6 +174,7 @@ class App:
         # --- Frame para checkboxes de curvas (abajo del resumen) ---
         self.checkbox_frame = tk.LabelFrame(self.v_paned, text="Curvas simuladas")
         self.v_paned.add(self.checkbox_frame, minsize=50)
+        self.v_paned.paneconfigure(self.checkbox_frame, minsize=50, stretch='never')
 
         # --- Frame intermedio con altura fija ---
         self.checkbox_area = tk.Frame(self.checkbox_frame)
@@ -175,11 +226,20 @@ class App:
         # Fijar proporción horizontal 30% (izquierda) y 70% (derecha) al inicio
         self.root.update_idletasks()
         total_width = self.root.winfo_width()
-        ancho_izquierdo = int(total_width * 0.25)  # 25%
+
+        # Establecer manualmente la posición de los divisores verticales (altura)
+        total_height = self.root.winfo_height()
+        altura_form = int(total_height * 0.55)      # ← MÁS alto (sube el divisor)
+        altura_resumen = int(total_height * 0.25)   # ← mediano
+        # checkbox ocupará el resto
+
         try:
-            self.h_paned.sash_place(0, ancho_izquierdo, 0)
+            self.v_paned.sash_place(0, 0, altura_form)
+            self.v_paned.sash_place(1, 0, altura_form + altura_resumen)
         except Exception:
             pass
+
+#====================================================================================================================================
 
     def on_resize(self, event):
         if event.widget is not self.root:
@@ -200,22 +260,40 @@ class App:
             pass
 
     def on_submit(self):
-        # Leer parámetros
+        # Leer parámetros del driver
         for key, entry in self.entries.items():
             val = entry.get()
             try:
                 self.user_params[key] = float(val)
             except ValueError:
                 self.user_params[key] = self.params[key]
+
+        # Leer configuración del recinto acústico
+        enclosure_type = self.enclosure_type_var.get()
+        try:
+            vb_litros = float(self.vb_entry.get())
+        except ValueError:
+            vb_litros = 20.0  # Valor por defecto si no es válido
+
+        # Crear objeto de recinto correspondiente
+        if enclosure_type == "Caja Sellada":
+            from core.sealed import SealedBox
+            enclosure = SealedBox(vb_litros)
+        else:
+            enclosure = None  # Infinite Baffle u otros sin carga acústica
+
         # Crea una tupla ordenada de los parámetros para comparar
-        param_tuple = tuple((k, self.user_params[k]) for k in sorted(self.user_params))
+        param_tuple = tuple((k, self.user_params[k]) for k in sorted(self.user_params)) + (enclosure_type, vb_litros)
         if param_tuple in self.simulated_params:
             messagebox.showerror("Error", "Ya existe una simulación con estos parámetros. Modifica algún valor para simular un driver diferente.")
             return
         self.simulated_params.add(param_tuple)
-        self.driver = Driver(self.user_params)
+
+        # Crear driver con recinto
+        self.driver = Driver(self.user_params, enclosure=enclosure)
         self.update_resumen()
         self.update_plots()
+
 
     def update_resumen(self):
         resumen = self.driver.resumen_parametros()

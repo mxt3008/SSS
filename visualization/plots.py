@@ -1,5 +1,6 @@
 # --------------------------------------------
-# 
+# plots.py
+
 # --------------------------------------------
 
 import numpy as np
@@ -323,6 +324,7 @@ def plot_all(                                                                   
                     child.remove()
 
     cursor = None
+
     if enable_cursor:
         clean_annotations(fig)
         all_lines = []
@@ -337,7 +339,9 @@ def plot_all(                                                                   
                 grid_cursor.remove()
             except Exception:
                 pass
+
         cursor = mplcursors.cursor(all_lines, hover=True)
+
         def cursor_fmt(sel):
             x = sel.target[0]
             y = sel.target[1]
