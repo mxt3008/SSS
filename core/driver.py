@@ -459,3 +459,26 @@ class Driver:
     # 9. Excursión máxima
     # ===============================
     
+    def excursion(self, frequencies, U=2.83):
+
+        if not isinstance(frequencies, (list, np.ndarray)):
+            raise ValueError("frequencies debe ser un array o lista de valores.")
+        if len(frequencies) == 0:
+            raise ValueError("El array de frecuencias no puede estar vacío.")
+
+        frequencies = np.asarray(frequencies)
+        displacements_m = np.array([self.displacement(f, U) for f in frequencies])
+        excursion_mm = displacements_m * 1000  # convierte a mm
+        excursion_peak = np.max(excursion_mm)
+
+        Xmax_mm = self.Xmax
+        excursion_ratio = excursion_mm / Xmax_mm
+
+        Z = np.array([self.impedance(f) for f in frequencies])
+        I = U / Z
+        F = self.Bl * I
+        force_array = np.abs(F)
+        force_peak = np.max(force_array)
+
+        return excursion_mm, excursion_ratio, excursion_peak, force_array, force_peak  
+    

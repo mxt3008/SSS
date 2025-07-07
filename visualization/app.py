@@ -294,9 +294,8 @@ class App:
         t_array = np.linspace(0, 5 * T0, 1000)                                         # 10 ciclos de la frecuencia fundamental
         step_t, step_x, step_v, step_a = self.driver.step_response(t_array)
         efficiency_val = self.driver.efficiency(frequencies)
-        excursions = velocities / (2 * np.pi * frequencies)
-        excursions_mm = excursions * 1000
-        excursion_ratio = excursions / self.driver.Xmax
+        excursion_mm, excursion_ratio, excursion_peak, cone_force_array, cone_force_peak = self.driver.excursion(frequencies)
+        xmax_mm = self.driver.Xmax
 
         # Guarda el nombre del driver para esta simulación
         if not hasattr(self, "sim_names"):
@@ -309,7 +308,7 @@ class App:
             lines, cursor = plot_all(
                 self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
                 displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, group_delay_vals, step_t, step_x, step_v, 
-                step_a, efficiency_val, excursions_mm, excursion_ratio, f_max,
+                step_a, efficiency_val, excursion_mm, excursion_ratio, excursion_peak, cone_force_array, cone_force_peak, xmax_mm, f_max,
                 fig=None, axs=None, linestyle=linestyle, label=nombre_driver,
                 show_legend=self.show_legends,
                 enable_cursor=self.enable_grid_cursor,
@@ -326,7 +325,7 @@ class App:
             lines, cursor = plot_all(
                 self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
                 displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, group_delay_vals, step_t, step_x, step_v, 
-                step_a, efficiency_val, excursions_mm, excursion_ratio, f_max,
+                step_a, efficiency_val, excursion_mm, excursion_ratio, excursion_peak, cone_force_array, cone_force_peak, xmax_mm, f_max,
                 fig=self.fig, axs=self.axs, linestyle=linestyle, label=nombre_driver,
                 show_legend=self.show_legends,
                 enable_cursor=self.enable_grid_cursor,
