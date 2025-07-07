@@ -259,7 +259,8 @@ def plot_all(                                                                   
     # Eje principal: Excursión [mm]
     ax_exc = axs[8]
     ln_exc_mm, = ax_exc.semilogx(frequencies, excursion_mm, color="royalblue", linestyle=linestyle, label=f"Excursión [mm] - {label}")
-    ln_xmax = ax_exc.axhline(y=xmax_mm, color="green", linestyle="--", linewidth=1.5, label=f"Xmax = {xmax_mm:.1f} mm")
+    ln_xmax, = ax_exc.semilogx(frequencies, np.full_like(frequencies, xmax_mm), color="green", linestyle="--", linewidth=1.5, label=f"Xmax = {xmax_mm:.1f} mm")
+
     ax_exc.set_ylabel("Excursión [mm]", fontsize=label_fontsize, color="royalblue", labelpad=2)
     ax_exc.tick_params(axis='y', labelcolor="royalblue", labelsize=tick_fontsize)
 
@@ -276,7 +277,7 @@ def plot_all(                                                                   
     ax_exc.grid(True, which="both")
 
     # Leyenda combinada
-    lns_excursion = [ln_exc_mm, ln_force, ln_xmax]
+    lns_excursion = [ln_exc_mm, ln_xmax, ln_force]
     labels_excursion = [l.get_label() for l in lns_excursion]
     ax_exc.legend(lns_excursion, labels_excursion, fontsize=label_fontsize, loc="upper left")
 
@@ -431,23 +432,30 @@ def maximize_subplot(self, event):
     new_ax = fig.add_subplot(111)
 
     # Copiar líneas del eje principal (plot y axhline)
+    # Copiar líneas del eje principal (plot y axhline)
     for line in ax.get_lines():
         x = line.get_xdata()
         y = line.get_ydata()
-        if len(x) == 2 and x[0] == x[1]:  # pos. línea vertical (ignorar)
-            continue
-        elif len(y) == 2 and y[0] == y[1]:  # línea horizontal como axhline
-            new_ax.axhline(y=y[0],
-                        color=line.get_color(),
-                        linestyle=line.get_linestyle(),
-                        linewidth=line.get_linewidth(),
-                        label=line.get_label())
+        label = line.get_label()
+        
+        # Detectar si es línea horizontal (como Xmax)
+        if np.allclose(y, y[0]):
+            new_ax.axhline(
+                y=y[0],
+                color=line.get_color(),
+                linestyle=line.get_linestyle(),
+                linewidth=line.get_linewidth(),
+                label=label
+            )
         else:
-            new_ax.plot(x, y,
-                        color=line.get_color(),
-                        linestyle=line.get_linestyle(),
-                        label=line.get_label(),
-                        visible=line.get_visible())
+            new_ax.plot(
+                x, y,
+                color=line.get_color(),
+                linestyle=line.get_linestyle(),
+                label=label,
+                visible=line.get_visible()
+            )
+
 
 
     # Si hay eje secundario (twinx), copiar también sus líneas

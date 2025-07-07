@@ -475,8 +475,9 @@ class Driver:
         excursion_ratio = excursion_mm / Xmax_mm
 
         Z = np.array([self.impedance(f) for f in frequencies])
-        I = U / Z
-        F = self.Bl * I
+        v = np.array([self.velocity(f) for f in frequencies])
+        a = 1j * 2 * np.pi * frequencies * v
+        F = self.Mms * a
         force_array = np.abs(F)
         force_peak = np.max(force_array)
 
