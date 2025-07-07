@@ -8,7 +8,11 @@ from scipy.signal import lti, step          # Importa lti y step para simular la
 from scipy.signal import savgol_filter      # Importa savgol_filter para suavizar la respuesta al escalón
 import textwrap
 
-class Driver:
+#====================================================================================================================================
+#====================================================================================================================================
+#====================================================================================================================================
+
+class Driver:  
     def __init__(self, params):
 
         # -------------------------------
@@ -391,28 +395,6 @@ class Driver:
         phase = np.unwrap(np.angle(H_array))
         dphi_df = np.gradient(phase, frequencies)
         dphi_domega = -dphi_df / (2 * np.pi)
-
-        # import matplotlib.pyplot as plt
-        # plt.figure(figsize=(12, 8))
-
-        # plt.subplot(3, 1, 1)
-        # plt.semilogx(frequencies, 20 * np.log10(np.abs(H_array)))
-        # plt.title("Magnitud de H(f)")
-        # plt.ylabel("Magnitud [dB]")
-        # plt.grid(True, which="both")
-
-        # plt.subplot(3, 1, 2)
-        # plt.semilogx(frequencies, np.angle(H_array, deg=True))
-        # plt.ylabel("Fase [°]")
-        # plt.grid(True, which="both")
-
-        # plt.subplot(3, 1, 3)
-        # plt.semilogx(frequencies, dphi_domega * 1000)
-        # plt.ylabel("Retardo de grupo [ms]")
-        # plt.xlabel("Frecuencia [Hz]")
-        # plt.grid(True, which="both")
-        # plt.tight_layout()
-        # plt.show()
 
         return -dphi_domega  # En segundos
     

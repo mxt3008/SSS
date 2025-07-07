@@ -1,3 +1,7 @@
+# --------------------------------------------
+# 
+# --------------------------------------------
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator, FixedLocator, LogLocator
@@ -7,91 +11,108 @@ from matplotlib.ticker import FuncFormatter
 import matplotlib
 import matplotlib.offsetbox
 
-def plot_all(
-    my_driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
-    displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, 
-    group_delay_vals, step_t, step_x, step_v, step_a, efficiency_val, excursions_mm, excursion_ratio, f_max,
-    fig=None, axs=None, linestyle="-", label="Simulación", show_legend=True,
-    enable_cursor=False,
-    grid_cursor=None
+#====================================================================================================================================
+#====================================================================================================================================
+#====================================================================================================================================
+# -------------------------------
+# Funciones de visualización para el driver
+# -------------------------------
+
+def plot_all(                                                                                                   # Parámetros de entrada
+    my_driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,                                         # Datos de impedancia y SPL
+    displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac,                                         # Datos de desplazamientos, velocidades y potencias
+    group_delay_vals, step_t, step_x, step_v, step_a, efficiency_val, excursions_mm, excursion_ratio,           # Datos de retardo de grupo, paso, eficiencia y excursiones
+    f_max,                                                                                                      # Frecuencia máxima
+    fig=None, axs=None, linestyle="-", label="Simulación", show_legend=True,                                    # Parámetros de visualización
+    enable_cursor=False,                                                                                        # Habilitar cursor interactivo
+    grid_cursor=None                                                                                            # Cursor de cuadrícula para interactividad
 ):
-    title_fontsize = 8
-    label_fontsize = 7
-    tick_fontsize = 6
+    title_fontsize = 8                                                                                          # Tamaño de fuente del título
+    label_fontsize = 7                                                                                          # Tamaño de fuente de las etiquetas
+    tick_fontsize = 6                                                                                           # Tamaño de fuente de las marcas
 
-    # --- Crear figura y ejes la primera vez ---
-    if fig is None or axs is None or not hasattr(plot_all, "_twin_axes"):
-        fig = plt.figure(figsize=(18, 8))
-        gs = fig.add_gridspec(
-            3, 3,
-            width_ratios=[1, 1, 1],
-            wspace=0.3,
-            hspace=0.35,
-            left=0.08, right=0.985, bottom=0.07, top=0.96
+    # -------------------------------
+    # Configuración de la figura y ejes
+    # -------------------------------
+
+    if fig is None or axs is None or not hasattr(plot_all, "_twin_axes"):                                       # Verifica si la figura y los ejes ya están creados
+        fig = plt.figure(figsize=(18, 8))                                                                       # Crea una nueva figura si no se proporciona una
+        gs = fig.add_gridspec(                                                                                  # Configuración de la cuadrícula de subgráficas
+            3, 3,                                                                                               # 3 filas y 3 columnas
+            width_ratios=[1, 1, 1],                                                                             # Proporciones de ancho para cada columna
+            wspace=0.3,                                                                                         # Espacio horizontal entre subgráficas
+            hspace=0.35,                                                                                        # Espacio vertical entre subgráficas
+            left=0.08, right=0.985, bottom=0.07, top=0.96                                                       # Márgenes de la figura
         )
-        axs = np.array([fig.add_subplot(gs[i, j]) for i in range(3) for j in range(3)])
-        axs = axs.flatten()
-        # Crear y guardar los ejes secundarios SOLO la primera vez
-        plot_all._twin_axes = {}
-        plot_all._twin_axes[0] = axs[0].twinx()  # Para impedancia/fase
-        plot_all._twin_axes[1] = axs[1].twinx()  # Para SPL/fase
-        #plot_all._twin_axes[4] = axs[4].twinx()  # Para potencias eléctricas/acústica
+        axs = np.array([fig.add_subplot(gs[i, j]) for i in range(3) for j in range(3)])                         # Crea una matriz de subgráficas de 3x3
+        axs = axs.flatten()                                                                                     # Aplana la matriz de subgráficas para facilitar el acceso
+
+        plot_all._twin_axes = {}                                                                                # Diccionario para almacenar ejes secundarios
+        plot_all._twin_axes[0] = axs[0].twinx()                                                                 # Para Z/fase
+        plot_all._twin_axes[1] = axs[1].twinx()                                                                 # Para SPL/fase
     else:
-        axs = axs.flatten()
-        # Reforzar escala log en cada llamada para subplots de frecuencia
-    for i in [0, 1, 2, 3, 4, 5, 7, 8]:
-        axs[i].set_xscale('log', nonpositive='clip')
+        axs = axs.flatten()                                                                                     # Asegura que axs sea un array plano
 
+    for i in [0, 1, 2, 3, 4, 5, 7, 8]:                                                                          # Limpia los ejes que no se usarán
+        axs[i].set_xscale('log', nonpositive='clip')                                                            # Configura el eje x como escala logarítmica
 
-    twin0 = plot_all._twin_axes[0]
-    twin1 = plot_all._twin_axes[1]
+    # -------------------------------
+    # Configuración de los ejes secundarios
+    # -------------------------------
+
+    twin0 = plot_all._twin_axes[0]                                                                              # Eje secundario para Z y fase
+    twin1 = plot_all._twin_axes[1]                                                                              # Eje secundario para SPL y fase
     
+    lines = []                                                                                                  # Lista para almacenar las líneas de las gráficas
 
-    lines = []
+    #====================================================================================================================================
+    # ===============================
+    # 1. Gráfica - Impedancia del driver - Magnitud y Fase
+    # ===============================
 
-    # 1. Impedancia y Fase Eléctrica
-    axs[0].set_title("Impedancia y Fase Eléctrica", fontsize=title_fontsize, fontweight='bold')
-    ax1 = axs[0]
-    ln1, = ax1.semilogx(frequencies, Z_magnitude, color="b", linestyle=linestyle, label=f"|Z| [Ohm] - {label}")
-    ln2, = twin0.semilogx(frequencies, Z_phase, color="r", linestyle=linestyle, label=f"∠Z [°] - {label}")
-    ax1.set_ylabel("Impedancia [Ohm]", color='b', fontsize=label_fontsize, labelpad=2)
-    twin0.set_ylabel("Fase [°]", color='r', fontsize=label_fontsize, labelpad=2)
-    ax1.tick_params(axis='y', labelcolor='b', labelsize=tick_fontsize)
-    twin0.tick_params(axis='y', labelcolor='r', labelsize=tick_fontsize, pad=8)
-    twin0.yaxis.set_label_coords(1.115, 0.5)
+    axs[0].set_title("Impedancia y Fase Eléctrica", fontsize=title_fontsize, fontweight='bold')                 # Título de la gráfica de impedancia
+    ax1 = axs[0]                                                                                                # Eje principal para la impedancia
+    ln1, = ax1.semilogx(frequencies, Z_magnitude, color="b", linestyle=linestyle, label=f"|Z| [Ohm] - {label}") # Magnitud de la impedancia
+    ln2, = twin0.semilogx(frequencies, Z_phase, color="r", linestyle=linestyle, label=f"∠Z [°] - {label}")      # Fase de la impedancia
+    ax1.set_ylabel("Impedancia [Ohm]", color='b', fontsize=label_fontsize, labelpad=2)                          # Etiqueta del eje y para la impedancia
+    twin0.set_ylabel("Fase [°]", color='r', fontsize=label_fontsize, labelpad=2)                                # Etiqueta del eje y para la fase
+    ax1.tick_params(axis='y', labelcolor='b', labelsize=tick_fontsize)                                          # Configuración de las marcas del eje y para la impedancia
+    twin0.tick_params(axis='y', labelcolor='r', labelsize=tick_fontsize, pad=8)                                 # Configuración de las marcas del eje y para la fase
+    twin0.yaxis.set_label_coords(1.115, 0.5)                                                                    # Ajusta la posición de la etiqueta del eje y de fase
 
-    lns1 = [ln1, ln2]
-    labs1 = [l.get_label() for l in lns1]
-    if show_legend:
-        ax1.legend(lns1, labs1, loc='best', fontsize=label_fontsize)
-    ax1.set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
-    ax1.tick_params(axis='x', labelsize=tick_fontsize)
-    lines.extend([ln1, ln2])
+    lines_imp = [ln1, ln2]                                                                                      # Lista de líneas para la leyenda de impedancia
+    labs1 = [l.get_label() for l in lines_imp]                                                                  # Obtiene las etiquetas de las líneas de impedancia
+    ax1.legend(lines_imp, labs1, loc='best', fontsize=label_fontsize)                                           # Añade la leyenda a la gráfica de impedancia
+    ax1.set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)                                      # Etiqueta del eje x
+    ax1.tick_params(axis='x', labelsize=tick_fontsize)                                                          # Configuración de las marcas del eje x
+    lines.extend([ln1, ln2])                                                                                    # Añade las líneas de impedancia a la lista de líneas
 
-    # 2. SPL y Fase
-    axs[1].set_title("Respuesta SPL y Fase", fontsize=title_fontsize, fontweight='bold')
-    ax_spl = axs[1]
-    ln3, = ax_spl.semilogx(frequencies, SPL_total, color="b", linestyle=linestyle, label=f"SPL Total - {label}")
-    ln4, = twin1.semilogx(frequencies, SPL_phase, color="g", linestyle=linestyle, label=f"Fase SPL [°] - {label}")
-    ax_spl.set_ylabel("SPL [dB]", color='b', fontsize=label_fontsize, labelpad=2)
-    twin1.set_ylabel("Fase [°]", color='g', fontsize=label_fontsize, labelpad=2)
-    ax_spl.tick_params(axis='y', labelcolor='b', labelsize=tick_fontsize)
-    twin1.tick_params(axis='y', labelcolor='g', labelsize=tick_fontsize, pad=8)
-    twin1.yaxis.set_label_coords(1.115, 0.5)
-    twin1.set_ylim(-180, 180)
+#====================================================================================================================================
+    # ===============================
+    # 2. Gráfica - SPL - Magnitud y Fase 
+    # ===============================
 
-    lns_spl_phase = [ln3, ln4]
-    labs_spl_phase = [l.get_label() for l in lns_spl_phase]
-    if show_legend:
-        ax_spl.legend(lns_spl_phase, labs_spl_phase, loc='best', fontsize=label_fontsize)
-    ax_spl.set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)
-    ax_spl.tick_params(axis='x', labelsize=tick_fontsize)
-    lines.extend([ln3, ln4])
+    axs[1].set_title("Respuesta SPL y Fase", fontsize=title_fontsize, fontweight='bold')                            # Título de la gráfica de SPL
+    ax_spl = axs[1]                                                                                                 # Eje principal para SPL
+    ln3, = ax_spl.semilogx(frequencies, SPL_total, color="b", linestyle=linestyle, label=f"SPL Total - {label}")    # Magnitud del SPL
+    ln4, = twin1.semilogx(frequencies, SPL_phase, color="g", linestyle=linestyle, label=f"Fase SPL [°] - {label}")  # Fase del SPL
+    ax_spl.set_ylabel("SPL [dB]", color='b', fontsize=label_fontsize, labelpad=2)                                   # Etiqueta del eje y para el SPL
+    twin1.set_ylabel("Fase [°]", color='g', fontsize=label_fontsize, labelpad=2)                                    # Etiqueta del eje y para la fase del SPL
+    ax_spl.tick_params(axis='y', labelcolor='b', labelsize=tick_fontsize)                                           # Configuración de las marcas del eje y para el SPL
+    twin1.tick_params(axis='y', labelcolor='g', labelsize=tick_fontsize, pad=8)                                     # Configuración de las marcas del eje y para la fase del SPL
+    twin1.yaxis.set_label_coords(1.115, 0.5)                                                                        # Ajusta la posición de la etiqueta del eje y de fase
+    twin1.set_ylim(-180, 180)                                                                                       # Limita el eje y de fase entre -180 y 180 grados
 
-    # --- Grid SOLO en el eje principal de las gráficas dobles ---
-    ax1.grid(True, which="both")
-    ax_spl.grid(True, which="both")
-    # --- Fuerza a desactivar el grid del eje secundario (fase) ---
+    lns_spl_phase = [ln3, ln4]                                                                                      # Lista de líneas para la leyenda de SPL
+    labs_spl_phase = [l.get_label() for l in lns_spl_phase]                                                         # Obtiene las etiquetas de las líneas de fase 
+    ax_spl.legend(lns_spl_phase, labs_spl_phase, loc='best', fontsize=label_fontsize)                               # Añade la leyenda a la gráfica e SPL
+    ax_spl.set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)                                       # Etiqueta del eje x
+    ax_spl.tick_params(axis='x', labelsize=tick_fontsize)                                                           # Configuración de las marcas del eje x
+    lines.extend([ln3, ln4])                                                                                        # Añade las líneas de SPL a la lista de líneas 
+
+    ax1.grid(True, which="both")                                                                                    # 
+    ax_spl.grid(True, which="both")                                                                                 # 
+
     for twin in [twin0, twin1]:
         twin.grid(False, axis='both')
         twin.xaxis.grid(False, which='both')
@@ -99,7 +120,11 @@ def plot_all(
         for gridline in twin.get_xgridlines() + twin.get_ygridlines():
             gridline.set_visible(False)
 
-    # 3. Desplazamiento de la bobina
+#====================================================================================================================================
+    # ===============================
+    # 3. Gráfica - Desplazamiento de la bobina
+    # ===============================
+
     axs[2].set_title("Desplazamiento de la Bobina", fontsize=title_fontsize, fontweight='bold')
     ln_disp, = axs[2].semilogx(frequencies, displacements_mm, color="b", linestyle=linestyle, label=f"Desplazamiento [mm] - {label}")
     axs[2].set_ylabel("Desplazamiento [mm]", fontsize=label_fontsize, labelpad=2)
@@ -108,7 +133,11 @@ def plot_all(
     axs[2].legend(fontsize=label_fontsize)
     lines.append(ln_disp)
 
-    # 4. Velocidad del cono
+#====================================================================================================================================
+    # ===============================
+    # 4. Gráfica - Velocidad del diafragma
+    # ===============================
+
     axs[3].set_title("Velocidad del Cono", fontsize=title_fontsize, fontweight='bold')
     ln6, = axs[3].semilogx(frequencies, velocities, color="m", linestyle=linestyle, label=f"Velocidad [m/s] - {label}")
     axs[3].set_ylabel("Velocidad [m/s]", fontsize=label_fontsize, labelpad=2)
@@ -117,7 +146,11 @@ def plot_all(
     axs[3].legend(fontsize=label_fontsize)
     lines.append(ln6)
 
-    # 5. Potencias Eléctricas y Acústica
+#====================================================================================================================================
+    # ===============================
+    # 5. Gráfica - Potencia acústica
+    # ===============================
+
     axs[4].set_title("Potencias Eléctricas y Acústica", fontsize=title_fontsize, fontweight='bold')
     ax5 = axs[4]
 
@@ -140,10 +173,13 @@ def plot_all(
 
     lns_power = [ln7, ln8, ln9, ln10]
     labs_power = [l.get_label() for l in lns_power]
-    if show_legend:
-        ax5.legend(lns_power, labs_power, loc="upper left", fontsize=label_fontsize)
+    ax5.legend(lns_power, labs_power, fontsize=label_fontsize, loc="lower left")
 
-    # 6. Retardo de grupo
+#====================================================================================================================================
+    # ===============================
+    # 6. Gráfica - Retardo de grupo
+    # ===============================
+
     axs[5].set_title("Retardo de Grupo", fontsize=title_fontsize, fontweight='bold')
     ln11, = axs[5].semilogx(frequencies, group_delay_vals*1000, color="m", linestyle=linestyle, label=f"Retardo de Grupo - {label}")
     axs[5].set_ylabel("Tiempo [ms]", fontsize=label_fontsize)
@@ -152,7 +188,11 @@ def plot_all(
     axs[5].legend(fontsize=label_fontsize)
     lines.append(ln11)
 
-    # 7. Respuesta al escalón
+#====================================================================================================================================
+    # ===============================
+    # 7. Gráfica - Respuesta al escalón
+    # ===============================
+
     axs[6].clear()  # 🔧 Limpia contenido anterior
     axs[6].set_title("Respuesta al Escalón", fontsize=title_fontsize, fontweight='bold')
     axs[6].set_xlabel("Tiempo [ms]", fontsize=label_fontsize)
@@ -164,7 +204,7 @@ def plot_all(
 
     formatter = FuncFormatter(lambda x, _: f"{x*1000:.0f} ms")
     axs[6].xaxis.set_major_formatter(formatter)
-    axs[6].xaxis.set_major_locator(MultipleLocator(0.02))  # Ejemplo: cada 20 ms
+    axs[6].xaxis.set_major_locator(MultipleLocator(0.02))
 
     axs[6].set_ylabel("Desplazamiento [mm]", fontsize=label_fontsize, color="b")
     ln_disp, = axs[6].plot(step_t*1000, step_x, color="b", linestyle=linestyle, label=f"Desplazamiento [mm] - {label}")
@@ -175,16 +215,16 @@ def plot_all(
     ax_vel.set_ylabel("Velocidad [mm/s]", fontsize=label_fontsize, color="g")
     ln_vel, = ax_vel.plot(step_t*1000, step_v, color="g", linestyle=linestyle, label=f"Velocidad [mm/s] - {label}")
     ln_vel.set_gid("Velocidad [mm/s]")
-    ax_vel.tick_params(axis='y', labelcolor="g")
+    ax_vel.tick_params(axis='y', labelcolor="g", labelsize=tick_fontsize)
 
     ax_acc = axs[6].twinx()
-    ax_acc.spines["right"].set_position(("axes", 1.15))  # Mueve este eje más a la derecha
+    #ax_acc.spines["right"].set_position(("axes", 1.15))  # Mueve este eje más a la derecha
     ax_acc.set_frame_on(True)
     ax_acc.patch.set_visible(False)  # Oculta fondo
     ax_acc.set_ylabel("Aceleración [mm/s²]", fontsize=label_fontsize, color="r")
     ln_acc, = ax_acc.plot(step_t*1000, step_a, color="r", linestyle=linestyle, label=f"Aceleración [mm/s²] - {label}")
     ln_acc.set_gid("Aceleración [mm/s²]")
-    ax_acc.tick_params(axis='y', labelcolor="r")
+    ax_acc.tick_params(axis='y', labelcolor="r", labelsize=tick_fontsize)
 
     lines_step = [ln_disp, ln_vel, ln_acc]
     labels_step = [l.get_label() for l in lines_step]
@@ -192,7 +232,11 @@ def plot_all(
 
     lines.extend(lines_step)
 
-    # 8. Eficiencia
+#====================================================================================================================================
+    # ===============================
+    # 8. Gráfica - Eficiencia del driver
+    # ===============================
+
     axs[7].set_title("Eficiencia", fontsize=title_fontsize, fontweight='bold')
     ln13, = axs[7].semilogx(frequencies, efficiency_val, color="m", linestyle=linestyle, label=f"Eficiencia [%] - {label}")        
     axs[7].set_ylabel("Eficiencia [%]", fontsize=label_fontsize)
@@ -200,10 +244,14 @@ def plot_all(
     axs[7].set_xscale("log")
     axs[7].tick_params(axis='both', labelsize=tick_fontsize)
     axs[7].grid(True, axis='y')
-    axs[7].legend(fontsize=label_fontsize)
+    axs[7].legend(fontsize=label_fontsize, loc="upper right")
     lines.append(ln13)    
 
-    # 9. Excursión pico y relación con Xmax
+#====================================================================================================================================
+    # ===============================
+    # 9. Gráfica - Excursión máxima
+    # ===============================
+
     axs[8].set_title("Excursión pico y Relación con Xmax", fontsize=title_fontsize, fontweight='bold')
     ln14, = axs[8].semilogx(frequencies, excursions_mm, color="b", linestyle=linestyle, label=f"Excursión [mm] - {label}")
     ln15, = axs[8].semilogx(frequencies, excursion_ratio, color="g", linestyle=linestyle, label=f"Excursión/Xmax - {label}")
@@ -213,7 +261,11 @@ def plot_all(
     axs[8].tick_params(axis='both', labelsize=tick_fontsize)
     lines.extend([ln14, ln15])
 
-    # Ajustes de ejes y formato logarítmico
+#====================================================================================================================================
+    # -------------------------------
+    # Ajustes finales de los ejes
+    # -------------------------------
+
     custom_ticks = [10, 100, 1000, 10000, 15000, 20000]
     def fmt_ticks(x, pos):
         if x == 0:
@@ -233,8 +285,10 @@ def plot_all(
         if i not in [0, 1]:
             ax.grid(True, which="both")
 
+    # -------------------------------
+    # Limpieza de anotaciones previas y configuración del cursor
+    # -------------------------------
 
-    # Limpieza robusta de anotaciones y bbox
     def clean_annotations(fig):
         for ax in fig.axes:
             for child in list(ax.get_children()):
@@ -290,7 +344,10 @@ def plot_all(
                 pass
         clean_annotations(fig)
 
-    # --- SOLUCIÓN FINAL: fuerza a ocultar los gridlines del twin después de todo ---
+    # -------------------------------
+    # Configuración de las cuadrículas y eliminación de líneas de cuadrícula en los ejes secundarios
+    # -------------------------------
+
     for ax in [twin0, twin1]:
         for gridline in ax.get_ygridlines():
             gridline.set_visible(False)
@@ -304,6 +361,10 @@ def plot_all(
                 gridline.set_visible(False)
             ax.grid(False, axis='y')
             ax.yaxis.grid(False, which='both')
+
+    # -------------------------------
+    # Configuración de eventos de maximización de subgráficas
+    # -------------------------------
 
     plot_all._subplot_data = {
         0: {  # Impedancia y Fase
@@ -328,6 +389,14 @@ def plot_all(
         },
     }
     return lines, cursor
+
+#====================================================================================================================================
+#====================================================================================================================================
+#====================================================================================================================================
+
+# -------------------------------
+# Función para maximizar subgráficas
+# -------------------------------
 
 def maximize_subplot(self, event):
     import mplcursors
@@ -388,7 +457,7 @@ def maximize_subplot(self, event):
 
     cursor = mplcursors.cursor(new_ax.get_lines(), hover=True)
 
-    def cursor_fmt(sel):
+    def cursor_fmt(sel): 
         x = sel.target[0]
         y = sel.target[1]
         x_label = f"{x/1000:.1f}k" if x >= 1000 else f"{x:.0f}"
