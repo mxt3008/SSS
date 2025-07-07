@@ -435,7 +435,7 @@ class App:
 
         if "Eficiencia" in title:
             new_ax.set_xlabel("Frecuencia [Hz]", fontsize=9)
-            new_ax.set_xscale('linear')  # o log si así lo prefieres
+            new_ax.set_xscale('log')  # o log si así lo prefieres
             new_ax.set_xlim(ax_clicked.get_xlim())
         elif "Escalón" in title or "Step" in title or "Tiempo" in title:
             new_ax.set_xlabel("Tiempo [ms]", fontsize=9)

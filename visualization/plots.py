@@ -192,9 +192,10 @@ def plot_all(
     ln13, = axs[7].semilogx(frequencies, efficiency_val, color="m", linestyle=linestyle, label=f"Eficiencia [%] - {label}")        
     axs[7].set_ylabel("Eficiencia [%]", fontsize=label_fontsize)
     axs[7].set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize)
+    axs[7].set_xscale("log")
     axs[7].tick_params(axis='both', labelsize=tick_fontsize)
     axs[7].grid(True, axis='y')
-    axs[6].legend(fontsize=label_fontsize)
+    axs[7].legend(fontsize=label_fontsize)
     lines.append(ln13)    
 
     # 9. Excursión pico y relación con Xmax
@@ -214,7 +215,7 @@ def plot_all(
             return "0"
         return f"{x/1000:.0f}k" if x >= 1000 else f"{x:.0f}"
     for i, ax in enumerate(axs.flat):
-        if i in [0, 1, 2, 3, 4, 5, 8]:  # Subplots que tienen eje X en frecuencia
+        if i in [0, 1, 2, 3, 4, 5, 7, 8]:  # Subplots que tienen eje X en frecuencia
             ax.set_xscale('log')
             ax.set_xlim([10, (f_max*1.1)])
             ax.xaxis.set_major_locator(FixedLocator(custom_ticks))
@@ -365,15 +366,23 @@ def maximize_subplot(self, event):
     new_ax.set_xlabel(ax.get_xlabel(), fontsize=9)
     new_ax.set_ylabel(ax.get_ylabel(), fontsize=9)
     new_ax.grid(True, which="both")
-    new_ax.set_xscale('log')
-    new_ax.xaxis.set_major_locator(LogLocator(base=10.0, numticks=10))
-    new_ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10)*.1, numticks=10))
-    new_ax.xaxis.set_major_formatter(ScalarFormatter())
-    new_ax.tick_params(axis='both', labelsize=8)
+    xscale = ax.get_xscale()
+    new_ax.set_xscale(xscale)
+
+    if xscale == 'log':
+        new_ax.xaxis.set_major_locator(LogLocator(base=10.0, numticks=12))
+        new_ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs='auto', numticks=12))
+        new_ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f"{x/1000:.0f}k" if x >= 1000 else f"{x:.0f}"))
+    else:
+        new_ax.xaxis.set_major_locator(MultipleLocator(100))
+        new_ax.xaxis.set_major_formatter(ScalarFormatter())
+        new_ax.tick_params(axis='both', labelsize=8)
+    
     if "SPL" in new_ax.get_title():
         new_ax.yaxis.set_major_locator(MultipleLocator(10))
 
     cursor = mplcursors.cursor(new_ax.get_lines(), hover=True)
+    
     def cursor_fmt(sel):
         x = sel.target[0]
         y = sel.target[1]
