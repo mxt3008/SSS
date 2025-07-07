@@ -158,11 +158,13 @@ def plot_all(
 
     axs[6].set_ylabel("Desplazamiento [mm]", fontsize=label_fontsize, color="b")
     ln_disp, = axs[6].plot(step_t, step_x, color="b", linestyle=linestyle, label=f"Desplazamiento [mm] - {label}")
+    ln_disp.set_gid("Desplazamiento [mm]")
     axs[6].tick_params(axis='y', labelcolor="b")
 
     ax_vel = axs[6].twinx()
     ax_vel.set_ylabel("Velocidad [mm/s]", fontsize=label_fontsize, color="g")
     ln_vel, = ax_vel.plot(step_t, step_v, color="g", linestyle=linestyle, label=f"Velocidad [mm/s] - {label}")
+    ln_vel.set_gid("Velocidad [mm/s]")
     ax_vel.tick_params(axis='y', labelcolor="g")
 
     ax_acc = axs[6].twinx()
@@ -171,6 +173,7 @@ def plot_all(
     ax_acc.patch.set_visible(False)  # Oculta fondo
     ax_acc.set_ylabel("Aceleración [mm/s²]", fontsize=label_fontsize, color="r")
     ln_acc, = ax_acc.plot(step_t, step_a, color="r", linestyle=linestyle, label=f"Aceleración [mm/s²] - {label}")
+    ln_acc.set_gid("Aceleración [mm/s²]")
     ax_acc.tick_params(axis='y', labelcolor="r")
 
     lines_step = [ln_disp, ln_vel, ln_acc]
