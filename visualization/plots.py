@@ -1,6 +1,5 @@
 # --------------------------------------------
 # plots.py
-
 # --------------------------------------------
 
 import numpy as np
@@ -52,11 +51,18 @@ def plot_all(                                                                   
         plot_all._twin_axes = {}                                                                                # Diccionario para almacenar ejes secundarios
         plot_all._twin_axes[0] = axs[0].twinx()                                                                 # Para Z/fase
         plot_all._twin_axes[1] = axs[1].twinx()                                                                 # Para SPL/fase
+        
     else:
         axs = axs.flatten()                                                                                     # Asegura que axs sea un array plano
 
     for i in [0, 1, 2, 3, 4, 5, 7, 8]:                                                                          # Limpia los ejes que no se usarán
-        axs[i].set_xscale('log', nonpositive='clip')                                                            # Configura el eje x como escala logarítmica
+        axs[i].set_xscale("log")                                                                                # Configura el eje x como escala logarítmica
+
+        # Asegura también que los ejes secundarios tengan escala logarítmica
+    for idx, twin_ax in plot_all._twin_axes.items():
+        if idx in [0, 1, 3, 4, 5, 7, 8]:  # Ejes que usan frecuencia como eje x
+            twin_ax.set_xscale("log")
+
 
     # -------------------------------
     # Configuración de los ejes secundarios
@@ -163,7 +169,10 @@ def plot_all(                                                                   
     ax5.set_ylabel("Potencias Eléctricas [W/VA]", color='k', fontsize=label_fontsize, labelpad=2)
     ax5.tick_params(axis='y', labelcolor='k', labelsize=tick_fontsize)
 
-    twin5 = ax5.twinx()
+    if 4 not in plot_all._twin_axes:
+        plot_all._twin_axes[4] = axs[4].twinx()
+    twin5 = plot_all._twin_axes[4]
+
     ln10, = twin5.semilogx(frequencies, P_ac, color="seagreen", linestyle=":", label=f"P. Acústica [W] - {label}")
     twin5.set_ylabel("Potencia Acústica [W]", color='seagreen', fontsize=label_fontsize, labelpad=2)
     twin5.tick_params(axis='y', labelcolor='seagreen', labelsize=tick_fontsize)
@@ -196,10 +205,12 @@ def plot_all(                                                                   
     # 7. Gráfica - Respuesta al escalón
     # ===============================
 
-    axs[6].clear()  # 🔧 Limpia contenido anterior
+    axs[6].clear()
+    axs[6].set_xscale("linear")  
     axs[6].set_title("Respuesta al Escalón", fontsize=title_fontsize, fontweight='bold')
     axs[6].set_xlabel("Tiempo [ms]", fontsize=label_fontsize)
-    axs[6].set_xlim(min(step_t*1000), max(step_t*1000))
+    t_ms = step_t * 1000
+    axs[6].set_xlim(np.min(t_ms), np.max(t_ms))
     axs[6].set_ylim(auto=True)  # Ajusta automáticamente el límite Y
     axs[6].autoscale(enable=True, axis='y')
     axs[6].grid(True, which="both")
@@ -214,7 +225,10 @@ def plot_all(                                                                   
     ln_disp.set_gid("Desplazamiento [mm]")
     axs[6].tick_params(axis='y', labelcolor="lightcoral")
 
-    ax_vel = axs[6].twinx()
+    if 6 not in plot_all._twin_axes:
+        plot_all._twin_axes[6] = axs[6].twinx()
+    ax_vel = plot_all._twin_axes[6]
+
     ax_vel.set_ylabel("Velocidad [mm/s]", fontsize=label_fontsize, color="darkcyan")
     ln_vel, = ax_vel.plot(step_t*1000, step_v, color="darkcyan", linestyle=linestyle, label=f"Velocidad [mm/s] - {label}")
     ln_vel.set_gid("Velocidad [mm/s]")
@@ -266,7 +280,10 @@ def plot_all(                                                                   
     ax_exc.tick_params(axis='y', labelcolor="royalblue", labelsize=tick_fontsize)
 
     # Eje secundario: Fuerza [N]
-    ax_force = ax_exc.twinx()
+    if 8 not in plot_all._twin_axes:
+        plot_all._twin_axes[8] = axs[8].twinx()
+    ax_force = plot_all._twin_axes[8]
+
     ln_force, = ax_force.semilogx(frequencies, cone_force_array, color="indianred", linestyle=linestyle, label=f"Fuerza pico [N] - {label}")
     ax_force.set_ylabel("Fuerza [N]", fontsize=label_fontsize, color="indianred", labelpad=2)
     ax_force.tick_params(axis='y', labelcolor="indianred", labelsize=tick_fontsize)
@@ -293,10 +310,12 @@ def plot_all(                                                                   
     # -------------------------------
 
     custom_ticks = [10, 100, 1000, 10000, 15000, 20000]
+
     def fmt_ticks(x, pos):
         if x == 0:
             return "0"
         return f"{x/1000:.0f}k" if x >= 1000 else f"{x:.0f}"
+    
     for i, ax in enumerate(axs.flat):
         if i in [0, 1, 2, 3, 4, 5, 7, 8]:  # Subplots que tienen eje X en frecuencia
             ax.set_xscale('log')
@@ -417,6 +436,18 @@ def plot_all(                                                                   
             "label2": "Fase SPL [°]",
         },
     }
+
+    for i, ax in enumerate(axs.flat):
+        if i in [0, 1, 2, 3, 4, 5, 7, 8]:
+            ax.set_xscale('log')
+            ax.set_xlim([10, f_max * 1.1])
+            ax.xaxis.set_major_locator(FixedLocator(custom_ticks))
+            ax.xaxis.set_minor_locator(LogLocator(base=10, subs='auto'))
+            ax.xaxis.set_major_formatter(FuncFormatter(fmt_ticks))
+        elif i == 6:
+            ax.set_xscale("linear")  # ✅ Asegura que no sea logarítmico
+            ax.autoscale(enable=True, axis='x')  # ✅ Autoscale para el eje X
+
     return lines, cursor
 
 #====================================================================================================================================
