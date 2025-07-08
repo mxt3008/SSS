@@ -4,6 +4,7 @@
 # --------------------------------------------
 
 from abc import ABC, abstractmethod
+from core.zrad import RadiationImpedance
 
 #====================================================================================================================================
 #====================================================================================================================================
@@ -11,16 +12,31 @@ from abc import ABC, abstractmethod
 
 class Enclosure(ABC):
 
-    def __init__(self, Vb_litros: float):
-        self.Vb_m3 = Vb_litros / 1000                                                           # Conversión de litros a m^3
+    def __init__(self, Vb_litros: float, rho0: float = 1.18, c: float = 343):
+        self.Vb_m3 = Vb_litros / 1000                                        # Conversión de litros a m^3
+        self.rho0 = rho0                                                    # Densidad del aire
+        self.c = c                                                          # Velocidad del sonido
+        self.zrad = RadiationImpedance(rho0, c)                             # Instancia del modelo de radiación
 
 #====================================================================================================================================
     # ===============================
-    #  Devuelve la carga acústica (impedancia) en Pa·s/m que el recinto impone al diafragma a una frecuencia dada.
-    #  f: frecuencia en Hz
-    #  Sd: área efectiva del cono en m^2
+    # Impedancia acústica trasera (propia del recinto). A implementar por cada tipo de caja.
     # ===============================
-
     @abstractmethod
     def acoustic_load(self, f: float, Sd: float) -> complex:
         pass
+
+#====================================================================================================================================
+    # ===============================
+    # Impedancia de radiación frontal (común para todos los recintos)
+    # Puede ser sobrescrita por subclases si se requiere otro modelo (e.g., horn, ducto, TL, etc.)
+    # ===============================
+    def radiation_impedance(self, f: float, Sd: float) -> complex:
+        return self.zrad.baffled_piston(f, Sd)
+
+#====================================================================================================================================
+    # ===============================
+    # Carga total acústica sobre el diafragma: suma de la carga trasera y la impedancia de radiación frontal
+    # ===============================
+    def total_acoustic_load(self, f: float, Sd: float) -> complex:
+        return self.acoustic_load(f, Sd) + self.radiation_impedance(f, Sd)

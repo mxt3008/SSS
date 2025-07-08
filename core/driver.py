@@ -1,5 +1,6 @@
 # --------------------------------------------
-# Inicializa un objeto Driver con parámetros eléctricos, mecánicos y geométricos. Calcula parámetros derivados necesarios para modelos de impedancia y SPL.
+# driver.py
+# Inicializa un objeto Driver con parámetros eléctricos, mecánicos y geométricos. Calcula parámetros derivados necesarios para modelos.
 # --------------------------------------------
 
 import numpy as np                          # Importa numpy para cálculos matemáticos complejos
@@ -94,10 +95,10 @@ class Driver:
 #====================================================================================================================================
 #====================================================================================================================================
 
-        # -------------------------------
-        # Resumen en consola
-        # Imprime los parámetros del driver de forma legible
-        # -------------------------------
+    # -------------------------------
+    # Resumen en consola
+    # Imprime los parámetros del driver de forma legible
+    # -------------------------------
     def resumen_parametros(self):
         return textwrap.dedent(f"""
         =======================================
