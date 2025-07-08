@@ -325,16 +325,16 @@ class Driver:
         if f <= 0:
             raise ValueError("La frecuencia debe ser mayor que cero para calcular la velocidad.")
 
-        Z = self.impedance(f)                      # Impedancia total eléctrica del driver
+        Z = self.impedance(f)                               # Impedancia total eléctrica del driver
         if np.abs(Z) == 0:
             raise ValueError("La impedancia Z es cero, no se puede calcular la velocidad.")
 
-        I = U / Z                                  # Corriente inducida en la bobina
-        w = 2 * np.pi * f                          # Frecuencia angular
+        I = U / Z                                           # Corriente inducida en la bobina
+        w = 2 * np.pi * f                                   # Frecuencia angular
 
-        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)  # Impedancia mecánica del driver
+        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)   # Impedancia mecánica del driver
 
-        v = I * (self.Bl / Zm)                     # Velocidad real del diafragma [m/s]
+        v = I * (self.Bl / Zm)                              # Velocidad real del diafragma [m/s]
 
         return v
     
