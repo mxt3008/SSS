@@ -5,6 +5,7 @@
 
 from abc import ABC, abstractmethod
 from core.zrad import RadiationImpedance
+from core.environment import AcousticEnvironment
 
 #====================================================================================================================================
 #====================================================================================================================================
@@ -12,10 +13,13 @@ from core.zrad import RadiationImpedance
 
 class Enclosure(ABC):
 
-    def __init__(self, Vb_litros: float, rho0: float = 1.18, c: float = 343):
-        self.Vb_m3 = Vb_litros / 1000                                        # Conversión de litros a m^3
-        self.rho0 = rho0                                                    # Densidad del aire
-        self.c = c                                                          # Velocidad del sonido
+    def __init__(self, Vb_litros: float):
+        
+        env = AcousticEnvironment()
+
+        self.Vb_m3 = Vb_litros / 1000                                       # Conversión de litros a m^3
+        rho0 = env.rho0                                                     # Densidad del aire
+        c = env.c                                                           # Velocidad del sonido
         self.zrad = RadiationImpedance(rho0, c)                             # Instancia del modelo de radiación
 
 #====================================================================================================================================

@@ -7,6 +7,7 @@
 
 import numpy as np
 from core.enclosure import Enclosure
+from core.environment import AcousticEnvironment
 
 #====================================================================================================================================
 #====================================================================================================================================
@@ -14,14 +15,20 @@ from core.enclosure import Enclosure
 
 class SealedBox(Enclosure): 
 
-    def __init__(self, Vb_litros: float, rho0: float = 1.18, c: float = 343):
+    def __init__(self, Vb_litros: float):
+
+        env = AcousticEnvironment()
+
+        rho0 = env.rho0                                            # Densidad del aire en kg/m^3
+        c = env.c                                                  # Velocidad del sonido en m/s
+
         super().__init__(Vb_litros, rho0, c)
 
 #====================================================================================================================================
     # ===============================
-    # Impedancia acústica trasera: aire comprimido en el volumen del recinto sellado.
-    # Es puramente reactiva (tipo compliancia)
+    # Impedancia acústica trasera: aire comprimido en el volumen del recinto sellado. Es puramente reactiva (tipo compliancia).
     # ===============================
+
     def acoustic_load(self, f: float, Sd: float) -> complex:
 
         omega = 2 * np.pi * f

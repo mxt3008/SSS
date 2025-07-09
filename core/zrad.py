@@ -5,15 +5,19 @@
 
 import numpy as np
 from scipy.special import j1
+from core.environment import AcousticEnvironment
 
 #====================================================================================================================================
 #====================================================================================================================================
 #====================================================================================================================================
 
 class RadiationImpedance:
-    def __init__(self, rho0=1.18, c=343):
-        self.rho0 = rho0  # Densidad del aire en kg/m^3
-        self.c = c        # Velocidad del sonido en m/s
+    def __init__(self):
+
+        env = AcousticEnvironment()
+
+        self.rho0 = env.rho0                                            # Densidad del aire en kg/m^3
+        self.c = env.c                                                  # Velocidad del sonido en m/s
 
     # --------------------------------------------
     # Impedancia de radiación de un pistón circular en baffle infinito.
