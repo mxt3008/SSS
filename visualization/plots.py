@@ -51,6 +51,12 @@ def plot_all(                                                                   
         plot_all._twin_axes = {}                                                                                # Diccionario para almacenar ejes secundarios
         plot_all._twin_axes[0] = axs[0].twinx()                                                                 # Para Z/fase
         plot_all._twin_axes[1] = axs[1].twinx()                                                                 # Para SPL/fase
+        plot_all._twin_axes[6] = axs[6].twinx()                                                                  # Velocidad
+        plot_all._twin_axes[66] = axs[6].twinx()                                                                 # Aceleración (solo una vez)
+        # Mueve el tercer eje Y a una posición más legible
+        plot_all._twin_axes[66].spines["right"].set_position(("axes", 1))
+        plot_all._twin_axes[66].set_frame_on(True)
+        plot_all._twin_axes[66].patch.set_visible(False)
         
     else:
         axs = axs.flatten()                                                                                     # Asegura que axs sea un array plano
@@ -72,7 +78,11 @@ def plot_all(                                                                   
     twin1 = plot_all._twin_axes[1]                                                                              # Eje secundario para SPL y fase
     
     lines = []                                                                                                  # Lista para almacenar las líneas de las gráficas
-
+    
+    prev_lines = [len(ax.get_lines()) for ax in axs]
+    prev_twin_lines = {}
+    for idx, twin in plot_all._twin_axes.items():
+        prev_twin_lines[idx] = len(twin.get_lines())
     #====================================================================================================================================
     # ===============================
     # 1. Gráfica - Impedancia del driver - Magnitud y Fase
@@ -205,48 +215,49 @@ def plot_all(                                                                   
     # 7. Gráfica - Respuesta al escalón
     # ===============================
 
-    axs[6].clear()
     axs[6].set_xscale("linear")  
     axs[6].set_title("Respuesta al Escalón", fontsize=title_fontsize, fontweight='bold')
     axs[6].set_xlabel("Tiempo [ms]", fontsize=label_fontsize)
     t_ms = step_t * 1000
     axs[6].set_xlim(np.min(t_ms), np.max(t_ms))
-    axs[6].set_ylim(auto=True)  # Ajusta automáticamente el límite Y
     axs[6].autoscale(enable=True, axis='y')
     axs[6].grid(True, which="both")
     axs[6].tick_params(axis='both', labelsize=tick_fontsize)
 
-    formatter = FuncFormatter(lambda x, _: f"{x*1000:.0f} ms")
+    formatter = FuncFormatter(lambda x, _: f"{x:.0f} ms")
     axs[6].xaxis.set_major_formatter(formatter)
-    axs[6].xaxis.set_major_locator(MultipleLocator(0.02))
+    axs[6].xaxis.set_major_locator(MultipleLocator(5))  # Ajusta a 5 ms o lo que sea razonable
 
     axs[6].set_ylabel("Desplazamiento [mm]", fontsize=label_fontsize, color="lightcoral")
     ln_disp, = axs[6].plot(step_t*1000, step_x, color="lightcoral", linestyle=linestyle, label=f"Desplazamiento [mm] - {label}")
     ln_disp.set_gid("Desplazamiento [mm]")
     axs[6].tick_params(axis='y', labelcolor="lightcoral")
 
-    if 6 not in plot_all._twin_axes:
-        plot_all._twin_axes[6] = axs[6].twinx()
+    # Eje secundario: Velocidad
     ax_vel = plot_all._twin_axes[6]
-
     ax_vel.set_ylabel("Velocidad [mm/s]", fontsize=label_fontsize, color="darkcyan")
     ln_vel, = ax_vel.plot(step_t*1000, step_v, color="darkcyan", linestyle=linestyle, label=f"Velocidad [mm/s] - {label}")
     ln_vel.set_gid("Velocidad [mm/s]")
     ax_vel.tick_params(axis='y', labelcolor="darkcyan", labelsize=tick_fontsize)
 
-    ax_acc = axs[6].twinx()
-    #ax_acc.spines["right"].set_position(("axes", 1.15))  # Mueve este eje más a la derecha
-    ax_acc.set_frame_on(True)
-    ax_acc.patch.set_visible(False)  # Oculta fondo
+    # Eje secundario: Aceleración (tercer eje)
+    ax_acc = plot_all._twin_axes[66]
     ax_acc.set_ylabel("Aceleración [mm/s²]", fontsize=label_fontsize, color="darkseagreen")
     ln_acc, = ax_acc.plot(step_t*1000, step_a, color="darkseagreen", linestyle=linestyle, label=f"Aceleración [mm/s²] - {label}")
     ln_acc.set_gid("Aceleración [mm/s²]")
     ax_acc.tick_params(axis='y', labelcolor="darkseagreen", labelsize=tick_fontsize)
 
+    # SOLO el eje principal tiene líneas horizontales de grilla
+    for twin in [ax_vel, ax_acc]:
+        twin.grid(False)
+        twin.yaxis.grid(False, which='both')
+        twin.xaxis.grid(False, which='both')
+        for gridline in twin.get_ygridlines() + twin.get_xgridlines():
+            gridline.set_visible(False)
+
     lines_step = [ln_disp, ln_vel, ln_acc]
     labels_step = [l.get_label() for l in lines_step]
     axs[6].legend(lines_step, labels_step, fontsize=label_fontsize, loc="upper right")
-
     lines.extend(lines_step)
 
 #====================================================================================================================================
@@ -266,7 +277,7 @@ def plot_all(                                                                   
 
 #====================================================================================================================================
     # ===============================
-    # 9. Gráfica - Excursión, Xmax y Fuerza
+    # 9. Gráfica - Excursión pico y Fuerza pico
     # ===============================
 
     axs[8].set_title("Excursión pico y Fuerza pico", fontsize=title_fontsize, fontweight='bold')
@@ -362,27 +373,30 @@ def plot_all(                                                                   
         cursor = mplcursors.cursor(all_lines, hover=True)
 
         def cursor_fmt(sel):
-            x = sel.target[0]
+            y_unit = ""
+            x_unit = "Hz"
+            label = sel.artist.get_label() if hasattr(sel.artist, "get_label") else ""
+            x_label = sel.target[0]
             y = sel.target[1]
-            x_label = f"{x/1000:.1f}k" if x >= 1000 else f"{x:.0f}"
-            label = sel.artist.get_label()
             if "∠Z" in label or "Phase" in label or "Fase" in label:
                 y_unit = "°"
             elif "|Z|" in label:
-                y_unit = "Ω"
+                y_unit = "Ohm"
             elif "SPL" in label:
                 y_unit = "dB"
             elif "Desplazamiento" in label:
                 y_unit = "mm"
             elif "Velocidad" in label:
                 y_unit = "m/s"
+            elif "Aceleración" in label:
+                y_unit = "m/s²"
             elif "Excursión/Xmax" in label:
                 y_unit = "(ratio)"
             elif "Excursión" in label:
                 y_unit = "mm"
-            else:
-                y_unit = ""
-            sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
+            elif "Potencia" in label or "P." in label:
+                y_unit = "W"
+            sel.annotation.set_text(f"X: {x_label:.2f} {x_unit}\nY: {y:.2f} {y_unit}")
         cursor.connect("add", cursor_fmt)
     else:
         if grid_cursor is not None:
@@ -409,6 +423,15 @@ def plot_all(                                                                   
                 gridline.set_visible(False)
             ax.grid(False, axis='y')
             ax.yaxis.grid(False, which='both')
+
+    # Limpieza de líneas de grilla en los twins de las gráficas 5, 7 y 9
+    for idx in [4, 6, 8, 66]:  # 4: Potencia, 6: Velocidad, 66: Aceleración, 8: Fuerza
+        twin = plot_all._twin_axes.get(idx)
+        if twin is not None:
+            for gridline in twin.get_ygridlines():
+                gridline.set_visible(False)
+            twin.grid(False, axis='y')
+            twin.yaxis.grid(False, which='both')
 
     # -------------------------------
     # Configuración de eventos de maximización de subgráficas
@@ -448,7 +471,13 @@ def plot_all(                                                                   
             ax.set_xscale("linear")  # ✅ Asegura que no sea logarítmico
             ax.autoscale(enable=True, axis='x')  # ✅ Autoscale para el eje X
 
-    return lines, cursor
+    new_lines = []
+    for i, ax in enumerate(axs):
+        new_lines.extend(ax.get_lines()[prev_lines[i]:])
+    for idx, twin in plot_all._twin_axes.items():
+        prev = prev_twin_lines.get(idx, 0)
+        new_lines.extend(twin.get_lines()[prev:])
+    return new_lines, cursor
 
 #====================================================================================================================================
 #====================================================================================================================================
@@ -458,22 +487,20 @@ def plot_all(                                                                   
 # Función para maximizar subgráficas
 # -------------------------------
 
-def maximize_subplot(self, event):
+def maximize_subplot(ax, event):
     import mplcursors
-    ax = event.inaxes
-    if ax is None:
-        return
+    import numpy as np
+    import matplotlib.ticker as ticker
+    from matplotlib.ticker import MultipleLocator, LogLocator, ScalarFormatter
+
     fig = plt.figure(figsize=(8, 6))
     new_ax = fig.add_subplot(111)
 
-    # Copiar líneas del eje principal (plot y axhline)
-    # Copiar líneas del eje principal (plot y axhline)
+    # Copiar líneas del eje principal
     for line in ax.get_lines():
         x = line.get_xdata()
         y = line.get_ydata()
         label = line.get_label()
-        
-        # Detectar si es línea horizontal (como Xmax)
         if np.allclose(y, y[0]):
             new_ax.axhline(
                 y=y[0],
@@ -491,26 +518,36 @@ def maximize_subplot(self, event):
                 visible=line.get_visible()
             )
 
-
-
-    # Si hay eje secundario (twinx), copiar también sus líneas
-    twin_ax = None
+    # --- Copiar TODOS los twins asociados a este subplot ---
+    twins = []
     for other_ax in ax.figure.axes:
-        if other_ax is not ax and hasattr(other_ax, 'get_shared_x_axes') and ax.get_shared_x_axes() == other_ax.get_shared_x_axes():
-            twin_ax = other_ax
-            break
+        if other_ax is not ax and hasattr(other_ax, "spines") and "right" in other_ax.spines:
+            # Compara la posición del eje para asegurarse que es twin del subplot
+            if np.allclose(other_ax.get_position().bounds, ax.get_position().bounds):
+                twins.append(other_ax)
 
-    if twin_ax:
-        new_twin = new_ax.twinx()
-        for line in twin_ax.get_lines():
-            new_twin.plot(line.get_xdata(), line.get_ydata(),
-                          color=line.get_color(),
-                          linestyle=line.get_linestyle(),
-                          label=line.get_label(),
-                          visible=line.get_visible())
-        new_twin.set_ylabel(twin_ax.get_ylabel(), fontsize=9)
-        new_twin.legend(fontsize=9, loc="upper right")
-    else:
+    for idx, orig_twin in enumerate(twins):
+        twin = new_ax.twinx()
+        orig_pos = orig_twin.spines["right"].get_position()
+        if orig_pos != ('outward', 0.0):
+            twin.spines["right"].set_position(orig_pos)
+            twin.set_frame_on(True)
+            twin.patch.set_visible(False)
+        twin.set_xscale(orig_twin.get_xscale())
+        twin.set_yscale(orig_twin.get_yscale())
+        twin.set_xlim(orig_twin.get_xlim())
+        twin.set_ylim(orig_twin.get_ylim())
+        twin.set_ylabel(orig_twin.get_ylabel(), fontsize=9)
+        twin.tick_params(axis='y', labelcolor=orig_twin.yaxis.get_label().get_color())
+        for line in orig_twin.get_lines():
+            twin.plot(line.get_xdata(), line.get_ydata(),
+                      color=line.get_color(),
+                      linestyle=line.get_linestyle(),
+                      label=line.get_label(),
+                      visible=line.get_visible())
+        if len(orig_twin.get_lines()) > 0:
+            twin.legend(fontsize=9, loc="upper right")
+    if not twins:
         new_ax.legend(fontsize=9)
 
     # Título y etiquetas
@@ -534,42 +571,114 @@ def maximize_subplot(self, event):
     if "SPL" in new_ax.get_title():
         new_ax.yaxis.set_major_locator(MultipleLocator(10))
 
-    cursor = mplcursors.cursor(new_ax.get_lines(), hover=True)
-
-    def cursor_fmt(sel): 
-        x = sel.target[0]
-        y = sel.target[1]
-        x_label = f"{x/1000:.1f}k" if x >= 1000 else f"{x:.0f}"
-        label = sel.artist.get_label()
-        if "Escalón" in label or "Escalón" in title or "Step" in label or "Tiempo" in label:
-            x_unit = "s"
-            y_unit = "mm"
-        elif "Eficiencia" in label:
-            x_unit = "Hz"
-            y_unit = "%"
-        elif "∠Z" in label or "Phase" in label or "Fase" in label:
-            x_unit = "Hz"
-        elif "|Z|" in label:
-            y_unit = "Ω"
-        elif "SPL" in label:
-            y_unit = "dB"
-        elif "Desplazamiento" in label:
-            y_unit = "mm"
-        elif "Velocidad" in label:
-            y_unit = "m/s"
-        elif "Aceleración" in label:
-            y_unit = "m/s²"
-        elif "Excursión/Xmax" in label:
-            y_unit = "(ratio)"
-        elif "Excursión" in label:
-            y_unit = "mm"
-        elif "Potencia" in label or "P." in label:
-            y_unit = "W"
-        else:
-            y_unit = ""
-            sel.annotation.set_text(f"X: {x:.2f} {x_unit}\nY: {y:.2f} {y_unit}")
-        sel.annotation.set_text(f"X: {x_label} Hz\nY: {y:.2f} {y_unit}")
+    # --- Cursor grid en la ventana maximizada ---
+    from visualization.plots import cursor_fmt
+    all_lines = []
+    all_lines.extend(new_ax.get_lines())
+    for twin in fig.axes:
+        if twin is not new_ax:
+            all_lines.extend(twin.get_lines())
+    cursor = mplcursors.cursor(all_lines, hover=True)
     cursor.connect("add", cursor_fmt)
+
+    # Mostrar/ocultar leyendas según el estado global
+    try:
+        from PyQt5.QtWidgets import QApplication
+        import matplotlib._pylab_helpers
+        for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers():
+            # Busca la última instancia de AppQt (ventana principal)
+            for widget in QApplication.topLevelWidgets():
+                if hasattr(widget, "show_legends"):
+                    show_legends = widget.show_legends
+                    from visualization.plots import toggle_legends_on_figure
+                    toggle_legends_on_figure(fig, show_legends)
+                    break
+    except Exception:
+        pass
+
     fig.tight_layout()
     fig.show()
     fig.canvas.draw_idle()
+
+def cursor_fmt(sel):
+    y_unit = ""
+    x_unit = "Hz"
+    label = sel.artist.get_label() if hasattr(sel.artist, "get_label") else ""
+    x_label = sel.target[0]
+    y = sel.target[1]
+    if "∠Z" in label or "Phase" in label or "Fase" in label:
+        y_unit = "°"
+    elif "|Z|" in label:
+        y_unit = "Ohm"
+    elif "SPL" in label:
+        y_unit = "dB"
+    elif "Desplazamiento" in label:
+        y_unit = "mm"
+    elif "Velocidad" in label:
+        y_unit = "m/s"
+    elif "Aceleración" in label:
+        y_unit = "m/s²"
+    elif "Excursión/Xmax" in label:
+        y_unit = "(ratio)"
+    elif "Excursión" in label:
+        y_unit = "mm"
+    elif "Potencia" in label or "P." in label:
+        y_unit = "W"
+    sel.annotation.set_text(f"X: {x_label:.2f} {x_unit}\nY: {y:.2f} {y_unit}")
+
+def toggle_legends_on_figure(fig, show_legends):
+    for ax in fig.axes:
+        legend = ax.get_legend()
+        if legend:
+            legend.set_visible(show_legends)
+    fig.canvas.draw_idle()
+
+if __name__ == "__main__":
+    # Ejemplo de datos ficticios para evitar error de variable no definida
+    results = {
+        'freq': np.logspace(1, 3, 100),  # 10 Hz a 1000 Hz
+        'Zt': np.abs(np.random.normal(10, 2, 100)),
+        'ZtΦ': np.random.uniform(-90, 90, 100),
+        'SPL': np.random.uniform(80, 110, 100),
+        'DEZ': np.random.uniform(0, 5, 100),
+        'groupdelay': np.random.uniform(0, 10, 100),
+    }
+
+    step_t = np.linspace(0, 1, 1000)  # 1000 valores de 0 a 1 segundo
+    step_x = np.zeros(1000)
+    step_v = np.zeros(1000)
+    step_a = np.zeros(1000)
+
+    # Llamada a la función plot_all con los resultados de ejemplo
+    plot_all(
+        my_driver=None,
+        frequencies=results['freq'],
+        Z_magnitude=results['Zt'],
+        Z_phase=results['ZtΦ'],
+        SPL_total=results['SPL'],
+        SPL_phase=np.zeros_like(results['SPL']),  # Si no tienes fase SPL, pon ceros
+        displacements_mm=results['DEZ'],
+        velocities=np.zeros_like(results['SPL']),
+        P_real=np.zeros_like(results['SPL']),
+        P_reactiva=np.zeros_like(results['SPL']),
+        P_aparente=np.zeros_like(results['SPL']),
+        P_ac=np.zeros_like(results['SPL']),
+        group_delay_vals=results['groupdelay']/1000,
+        step_t=step_t,
+        step_x=step_x,
+        step_v=step_v,
+        step_a=step_a,
+        efficiency_val=np.zeros_like(results['SPL']),
+        excursion_mm=results['DEZ'],
+        excursion_ratio=np.zeros_like(results['SPL']),
+        excursion_peak=np.zeros_like(results['SPL']),
+        cone_force_array=np.zeros_like(results['SPL']),
+        cone_force_peak=np.zeros_like(results['SPL']),
+        xmax_mm=10,
+        f_max=1000,
+        linestyle="-",
+        label="Bandpass Isobárico",
+        show_legend=True,
+        enable_cursor=True,
+        grid_cursor=None
+    )

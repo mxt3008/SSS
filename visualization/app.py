@@ -16,6 +16,9 @@ from visualization.plots import plot_all
 
 class App:
     def __init__(self, root, params, units):
+
+        self.sim_names = []
+        
         self.root = root
         self.params = params.copy()
         self.units = units
@@ -156,6 +159,18 @@ class App:
             self.entries[key] = entry
             row += 1
 
+        # Menú para modelo de radiación frontal
+        self.radiation_model_var = tk.StringVar(value="baffled")  # Valor por defecto
+        tk.Label(self.form_container, text="Modelo de radiación:", font=("Arial", 9)).grid(
+            row=row, column=3, sticky="e", padx=5, pady=2
+        )
+        self.radiation_model_menu = tk.OptionMenu(
+            self.form_container, self.radiation_model_var, "baffled", "unbaffled"
+        )
+        self.radiation_model_menu.grid(row=row, column=4, sticky="w", padx=5, pady=2)
+
+        row += 1
+
         self.form_container.grid_columnconfigure(1, weight=0)  # Driver params
         self.form_container.grid_columnconfigure(4, weight=0)  # Enclosure params
 
@@ -279,6 +294,11 @@ class App:
         if enclosure_type == "Caja Sellada":
             from core.sealed import SealedBox
             enclosure = SealedBox(vb_litros)
+        elif enclosure_type == "Bass-reflex":
+            from core.bassreflex import BassReflexBox
+            area_ducto = self.user_params.get("AreaDucto", 10)  # Valor por defecto
+            largo_ducto = self.user_params.get("LargoDucto", 10)  # Valor por defecto
+            enclosure = BassReflexBox(vb_litros, area_ducto, largo_ducto)
         else:
             enclosure = None  # Infinite Baffle u otros sin carga acústica
 
@@ -289,8 +309,11 @@ class App:
             return
         self.simulated_params.add(param_tuple)
 
+        # Modelo de radiación (nuevo)
+        radiation_model = self.radiation_model_var.get()
+
         # Crear driver con recinto
-        self.driver = Driver(self.user_params, enclosure=enclosure)
+        self.driver = Driver(self.user_params, enclosure=enclosure, radiation_model=radiation_model)
         self.update_resumen()
         self.update_plots()
 
@@ -350,7 +373,13 @@ class App:
         import matplotlib.pyplot as plt
 
         linestyles = ["-", "--", "-.", ":"]
+        if not hasattr(self, "plot_count"):
+            self.plot_count = 0
+
         linestyle = linestyles[self.plot_count % len(linestyles)]
+        nombre_driver = self.name_var.get().strip() or f"Simulación {self.plot_count+1}"
+        self.sim_names.append(nombre_driver)
+        self.plot_count += 1  # Incrementa solo cuando agregas una simulación
 
         f_max = self.driver.f_max_ka()
         frequencies = np.logspace(np.log10(5), np.log10(f_max), 1000)
@@ -375,9 +404,6 @@ class App:
         excursion_mm, excursion_ratio, excursion_peak, cone_force_array, cone_force_peak = self.driver.excursion(frequencies)
         xmax_mm = self.driver.Xmax
 
-        # Guarda el nombre del driver para esta simulación
-        if not hasattr(self, "sim_names"):
-            self.sim_names = []
         nombre_driver = self.name_var.get().strip() or f"Simulación {self.plot_count+1}"
         self.sim_names.append(nombre_driver)
 
@@ -424,7 +450,6 @@ class App:
                 self.canvas.draw()
 
         self.plot_lines.append(lines)
-        self.plot_count += 1
 
         # Elimina los checkboxes anteriores
         for cb in self.checkboxes:
