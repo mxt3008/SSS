@@ -17,20 +17,9 @@ class SealedBox(Enclosure):
 
     def __init__(self, Vb_litros: float):
 
-        env = AcousticEnvironment()
+        super().__init__(Vb_litros)
 
-        rho0 = env.rho0                                            # Densidad del aire en kg/m^3
-        c = env.c                                                  # Velocidad del sonido en m/s
-
-        super().__init__(Vb_litros, rho0, c)
-
-#====================================================================================================================================
-    # ===============================
-    # Impedancia acústica trasera: aire comprimido en el volumen del recinto sellado. Es puramente reactiva (tipo compliancia).
-    # ===============================
-
-    def acoustic_load(self, f: float, Sd: float) -> complex:
-
+    def acoustic_load(self, f, Sd):
         omega = 2 * np.pi * f
         Cab = self.Vb_m3 / (self.rho0 * self.c**2)
         Za = 1 / (1j * omega * Cab * Sd**2)

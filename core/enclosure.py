@@ -18,9 +18,9 @@ class Enclosure(ABC):
         env = AcousticEnvironment()
 
         self.Vb_m3 = Vb_litros / 1000                                       # Conversión de litros a m^3
-        rho0 = env.rho0                                                     # Densidad del aire
-        c = env.c                                                           # Velocidad del sonido
-        self.zrad = RadiationImpedance(rho0, c)                             # Instancia del modelo de radiación
+        self.rho0 = env.rho0                                                     # Densidad del aire
+        self.c = env.c                                                           # Velocidad del sonido
+        self.zrad = RadiationImpedance()                             # Instancia del modelo de radiación
 
 #====================================================================================================================================
     # ===============================
@@ -36,7 +36,8 @@ class Enclosure(ABC):
     # Puede ser sobrescrita por subclases si se requiere otro modelo (e.g., horn, ducto, TL, etc.)
     # ===============================
     def radiation_impedance(self, f: float, Sd: float) -> complex:
-        return self.zrad.baffled_piston(f, Sd)
+        # Devuelve la impedancia de radiación frontal en impedancia mecánica (divide por Sd^2)
+        return self.zrad.baffled_piston(f, Sd) / (Sd**2)
 
 #====================================================================================================================================
     # ===============================

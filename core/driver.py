@@ -14,7 +14,9 @@ import textwrap
 #====================================================================================================================================
 
 class Driver:  
-    def __init__(self, params, enclosure=None):
+    def __init__(self, params, enclosure=None, radiation_model="baffled"):
+
+        self.radiation_model = radiation_model  # <-- Agrega esto
 
         # -------------------------------
         # Parámetros del enclosure
@@ -203,11 +205,22 @@ class Driver:
     # 1. Impedancia del driver - Magnitud y Fase
     # ===============================
 
-    def impedance(self, f):                                             # Impedancia del driver a una frecuencia f
-        w = 2 * np.pi * f                                               # Frecuencia angular 
-        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)               # Impedancia mecánica del driver
-        if self.Reh:                                                    # Si Reh está definido, usa el modelo extendido
-            Z_le_extended = 1 / (1j*w*self.Le + 1/self.Reh)             # Impedancia de la inductancia extendida, considerando Reh
+    def impedance(self, f):
+        w = 2 * np.pi * f
+
+        # --- Carga acústica total (trasera + radiación frontal) ---
+        Za = 0
+        if self.enclosure is not None and hasattr(self.enclosure, "total_acoustic_load"):
+            Za = self.enclosure.total_acoustic_load(f, self.Sd)
+        elif self.enclosure is not None and hasattr(self.enclosure, "acoustic_load"):
+            Za = self.enclosure.acoustic_load(f, self.Sd)
+        else:
+            Za = 0
+
+        Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms) + Za
+
+        if self.Reh:
+            Z_le_extended = 1 / (1j*w*self.Le + 1/self.Reh)
         else:
             Z_le_extended = 1j*w*self.Le
 
@@ -488,5 +501,17 @@ class Driver:
         force_array = np.abs(F)
         force_peak = np.max(force_array)
 
-        return excursion_mm, excursion_ratio, excursion_peak, force_array, force_peak  
-    
+        return excursion_mm, excursion_ratio, excursion_peak, force_array, force_peak
+
+    def z_rad_frontal(self, f):
+        # Pistón en baffle infinito (aprox. masa acústica para bajas f)
+        rho0 = self.rho0
+        c = self.c
+        Sd = self.Sd
+        a = np.sqrt(Sd / np.pi)
+        w = 2 * np.pi * f
+        k = w / c
+        # Masa acústica (baja frecuencia)
+        Ma = 8 * rho0 / (3 * np.pi * a)
+        Z_rad = 1j * w * Ma * Sd**2
+        return Z_rad
