@@ -50,46 +50,48 @@ units = {
     "Xmax": "mm"
 }
 
+# --------------------------------------------
+# Función principal
+# --------------------------------------------
+
+def main():
+    """
+    Función principal para ejecutar la aplicación SSS.
+    Por defecto ejecuta la versión Qt5, pero puede cambiarse a Tkinter.
+    """
+    try:
+        # Intentar ejecutar la aplicación Qt5
+        print("Iniciando aplicación SSS (Qt5)...")
+        print("Creando QApplication...")
+        app = QApplication(sys.argv)
+        print("QApplication creada exitosamente")
+        
+        print("Creando ventana AppQt...")
+        window = AppQt(params, units)
+        print("Ventana AppQt creada exitosamente")
+        
+        print("Mostrando ventana...")
+        window.show()
+        print("Ventana mostrada, iniciando loop de eventos...")
+        
+        sys.exit(app.exec_())
+    except Exception as e:
+        print(f"Error al iniciar aplicación Qt5: {e}")
+        import traceback
+        traceback.print_exc()
+        print("Intentando con aplicación Tkinter...")
+        try:
+            # Alternativa: ejecutar aplicación Tkinter
+            root = tk.Tk()
+            root.title("SSS - Speaker Simulation System")
+            app = App(root, params, units)
+            root.mainloop()
+        except Exception as e2:
+            print(f"Error al iniciar aplicación Tkinter: {e2}")
+            import traceback
+            traceback.print_exc()
+            print("No se pudo iniciar ninguna aplicación.")
+            sys.exit(1)
+
 if __name__ == "__main__":
-    from core.bassreflex import BassReflexBox
-    from core.driver import Driver
-    import matplotlib.pyplot as plt
-    import numpy as np
-
-    params = {
-        "Fs": 40,
-        "Mms": 0.025,
-        "Vas": 50,
-        "Qts": 0.35,
-        "Qes": 0.4,
-        "Qms": 4.5,
-        "Re": 6.0,
-        "Bl": 7.5,
-        "Sd": 0.021,
-        "Le": 0.5e-3,
-        "Xmax": 5.0
-    }
-    # Usa un puerto más largo y área razonable
-    enclosure = BassReflexBox(50, 0.002, 0.20)  # Vb=50L, área ducto=0.002m², largo=0.20m
-    driver = Driver(params, enclosure=enclosure)
-    freqs = np.logspace(np.log10(10), np.log10(1000), 500)
-    Z = np.array([driver.impedance(f) for f in freqs])
-
-    plt.figure()
-    plt.semilogx(freqs, np.abs(Z))
-    plt.xlabel("Frecuencia [Hz]")
-    plt.ylabel("Impedancia [Ohm]")
-    plt.title("Bass-reflex: Impedancia eléctrica")
-    plt.grid(True, which="both")
-    plt.show()
-
-    for f in freqs:
-        Za = enclosure.acoustic_load(f, params["Sd"])
-        print(f"f={f:.1f} Hz, |Za|={np.abs(Za):.4f} N·s/m")
-
-#====================================================================================================================================
-#====================================================================================================================================
-#====================================================================================================================================
-
-# Fin del script principal
-
+    main()

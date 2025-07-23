@@ -113,7 +113,7 @@ class App:
 
         # Menú desplegable + Vb en la misma fila
         self.enclosure_type_var = tk.StringVar(value="Infinite Baffle")
-        enclosure_options = ["Infinite Baffle", "Caja Sellada", "Bass-reflex"]
+        enclosure_options = ["Infinite Baffle", "Caja Sellada", "Bass-reflex", "Bandpass Isobárico"]
         self.enclosure_menu = tk.OptionMenu(self.form_container, self.enclosure_type_var, *enclosure_options)
         self.enclosure_menu.grid(row=row, column=3, columnspan=2, sticky="w", padx=5, pady=2)
 
@@ -299,6 +299,14 @@ class App:
             area_ducto = self.user_params.get("AreaDucto", 10)  # Valor por defecto
             largo_ducto = self.user_params.get("LargoDucto", 10)  # Valor por defecto
             enclosure = BassReflexBox(vb_litros, area_ducto, largo_ducto)
+        elif enclosure_type == "Bandpass Isobárico":
+            # Por ahora usamos caja sellada como aproximación
+            from core.sealed import SealedBox
+            enclosure = SealedBox(vb_litros)
+            messagebox.showinfo("Bandpass Isobárico", 
+                              "Bandpass Isobárico seleccionado.\n"
+                              "Usando caja sellada como aproximación por ahora.\n"
+                              "Para configuración completa, usa la aplicación Qt5.")
         else:
             enclosure = None  # Infinite Baffle u otros sin carga acústica
 
@@ -381,7 +389,7 @@ class App:
         self.sim_names.append(nombre_driver)
         self.plot_count += 1  # Incrementa solo cuando agregas una simulación
 
-        f_max = self.driver.f_max_ka()
+        f_max = self.driver.f_max_ka(ka_max=1.0)  # Limitar a ka ≤ 1
         frequencies = np.logspace(np.log10(5), np.log10(f_max), 1000)
         Z_values = np.array([self.driver.impedance(f) for f in frequencies])
         Z_magnitude = np.abs(Z_values)

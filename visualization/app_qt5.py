@@ -136,45 +136,74 @@ class AppQt(QMainWindow):
 
         def update_enclosure_fields():
             tipo = self.enclosure_type_combo.currentText()
-            # Mostrar/ocultar campos según el tipo de recinto
-            form_layout.labelForField(self.vb_entry).setVisible(tipo != "Infinite Baffle")
-            self.vb_entry.setVisible(tipo != "Infinite Baffle")
-            form_layout.labelForField(self.area_port_entry).setVisible(tipo == "Bass-reflex")
-            self.area_port_entry.setVisible(tipo == "Bass-reflex")
-            form_layout.labelForField(self.length_port_entry).setVisible(tipo == "Bass-reflex")
-            self.length_port_entry.setVisible(tipo == "Bass-reflex")
+            
+            # Campos básicos de volumen (para todas las cajas excepto Infinite Baffle)
+            vb_visible = tipo != "Infinite Baffle"
+            form_layout.labelForField(self.vb_entry).setVisible(vb_visible)
+            self.vb_entry.setVisible(vb_visible)
+            
+            # Campos de Bass-reflex
+            bassreflex_visible = tipo == "Bass-reflex"
+            form_layout.labelForField(self.area_port_entry).setVisible(bassreflex_visible)
+            self.area_port_entry.setVisible(bassreflex_visible)
+            form_layout.labelForField(self.length_port_entry).setVisible(bassreflex_visible)
+            self.length_port_entry.setVisible(bassreflex_visible)
+            
+            # Campos específicos de Bandpass Isobárico
+            bandpass_visible = tipo == "Bandpass Isobárico"
+            
+            # Volúmenes para bandpass
+            form_layout.labelForField(self.vb_front_entry).setVisible(bandpass_visible)
+            self.vb_front_entry.setVisible(bandpass_visible)
+            form_layout.labelForField(self.vab_entry).setVisible(bandpass_visible)
+            self.vab_entry.setVisible(bandpass_visible)
+            
+            # Ductos para bandpass
+            form_layout.labelForField(self.fp_entry).setVisible(bandpass_visible)
+            self.fp_entry.setVisible(bandpass_visible)
+            form_layout.labelForField(self.dd_entry).setVisible(bandpass_visible)
+            self.dd_entry.setVisible(bandpass_visible)
+            form_layout.labelForField(self.dp_entry).setVisible(bandpass_visible)
+            self.dp_entry.setVisible(bandpass_visible)
+            form_layout.labelForField(self.lp_entry).setVisible(bandpass_visible)
+            self.lp_entry.setVisible(bandpass_visible)
+            
+            # Solo parámetros específicos para sistema isobárico (no duplicar los del driver)
+            form_layout.labelForField(self.lvc_entry).setVisible(bandpass_visible)
+            self.lvc_entry.setVisible(bandpass_visible)
+            form_layout.labelForField(self.mmd_entry).setVisible(bandpass_visible)
+            self.mmd_entry.setVisible(bandpass_visible)
 
+        # Conectar la función y habilitar la funcionalidad
         self.enclosure_type_combo.currentIndexChanged.connect(update_enclosure_fields)
-        update_enclosure_fields()
 
         self.simulation_history = []
 
         # --- Campos adicionales para Bandpass Isobárico ---
-        self.vab_entry = QLineEdit("0.150")
-        form_layout.addRow("Volumen cámara trasera Vab [m³]:", self.vab_entry)
-        self.fp_entry = QLineEdit("27.36")
+        # Volúmenes
+        self.vb_front_entry = QLineEdit("15")  # Volumen cámara frontal
+        form_layout.addRow("Volumen cámara frontal Vf [L]:", self.vb_front_entry)
+        self.vab_entry = QLineEdit("25")  # Volumen cámara trasera 
+        form_layout.addRow("Volumen cámara trasera Vab [L]:", self.vab_entry)
+        
+        # Ductos
+        self.fp_entry = QLineEdit("45")
         form_layout.addRow("Frecuencia de sintonía fp [Hz]:", self.fp_entry)
-        self.dd_entry = QLineEdit("0.3366")
+        self.dd_entry = QLineEdit("0.20")
         form_layout.addRow("Diámetro diafragma dd [m]:", self.dd_entry)
-        self.dp_entry = QLineEdit("0.2")
+        self.dp_entry = QLineEdit("0.10")
         form_layout.addRow("Diámetro puerto dp [m]:", self.dp_entry)
+        self.lp_entry = QLineEdit("0.15")
+        form_layout.addRow("Longitud puerto Lp [m]:", self.lp_entry)
 
-        self.re_entry = QLineEdit("5.0")
-        form_layout.addRow("Resistencia del driver Re [Ω]:", self.re_entry)
-        self.qes_entry = QLineEdit("0.4")
-        form_layout.addRow("Qes:", self.qes_entry)
-        self.qms_entry = QLineEdit("3.0")
-        form_layout.addRow("Qms:", self.qms_entry)
-        self.fs_entry = QLineEdit("30.0")
-        form_layout.addRow("Frecuencia fs [Hz]:", self.fs_entry)
+        # Parámetros específicos para bandpass isobárico
         self.lvc_entry = QLineEdit("0.1")
-        form_layout.addRow("Lvc:", self.lvc_entry)
-        self.sd_entry = QLineEdit("0.01")
-        form_layout.addRow("Área del diafragma Sd [m²]:", self.sd_entry)
-        self.bl_entry = QLineEdit("10.0")
-        form_layout.addRow("BL [Tm]:", self.bl_entry)
+        form_layout.addRow("Lvc [mH]:", self.lvc_entry)
         self.mmd_entry = QLineEdit("0.015")
         form_layout.addRow("Mmd [kg]:", self.mmd_entry)
+
+        # Inicializar la visibilidad de los campos
+        update_enclosure_fields()
 
     def on_submit(self):
         # Leer parámetros
@@ -206,31 +235,43 @@ class AppQt(QMainWindow):
             from core.sealed import SealedBox
             enclosure = SealedBox(vb_litros)
         elif enclosure_type == "Bandpass Isobárico":
+            # Usar la clase BandpassIsobaricBox
+            try:
+                vab_litros = float(self.vab_entry.text())
+            except ValueError:
+                vab_litros = 25.0
+                
             from core.bandpass_isobaric import BandpassIsobaricBox
-            params = {
+            params_bandpass = {
                 'rho0': 1.2,
                 'c0': 344,
                 'V0': 2.83,
                 'B': 0.8333,
-                'Re': float(self.re_entry.text()),
+                'Re': self.user_params['Re'],  # Usar parámetros originales del driver
                 'Red': 3.77,
-                'Qes': float(self.qes_entry.text()),
-                'Qms': float(self.qms_entry.text()),
-                'fs': float(self.fs_entry.text()),
-                'Lvc': float(self.lvc_entry.text()),
-                'S': float(self.sd_entry.text()),
-                'Vab': float(self.vab_entry.text()),
+                'Qes': self.user_params['Qes'],
+                'Qms': self.user_params['Qms'],
+                'fs': self.user_params['Fs'],
+                'Lvc': float(self.lvc_entry.text()) / 1000,  # convertir mH a H
+                'S': self.user_params['Sd'],
+                'Vab': vab_litros / 1000,  # convertir a m³
+                'Vf': float(self.vb_front_entry.text()) / 1000,  # convertir a m³
                 'fp': float(self.fp_entry.text()),
                 'dd': float(self.dd_entry.text()),
                 'dp': float(self.dp_entry.text()),
-                'BL': float(self.bl_entry.text()),
+                'Lp': float(self.lp_entry.text()),
+                'BL': self.user_params['Bl'],
                 'Mmd': float(self.mmd_entry.text()),
             }
-            freq = np.logspace(np.log10(5), np.log10(1000), 1000)
-            box = BandpassIsobaricBox(params)
-            results = box.simulate(freq)
-            # Ahora puedes graficar results['freq'], results['SPL'], etc.
-            return  # Salir aquí para no continuar con el resto del método
+            enclosure = BandpassIsobaricBox(params_bandpass)
+            
+            # Mostrar mensaje informativo
+            QMessageBox.information(self, "Bandpass Isobárico", 
+                                  "Bandpass Isobárico configurado correctamente.\n"
+                                  "Volúmenes configurados:\n"
+                                  f"- Cámara frontal: {self.vb_front_entry.text()} L\n"
+                                  f"- Cámara trasera: {self.vab_entry.text()} L\n"
+                                  f"- Frecuencia de sintonía: {self.fp_entry.text()} Hz")
         else:
             enclosure = None
 
@@ -252,13 +293,51 @@ class AppQt(QMainWindow):
             return
         self.simulation_history.append(sim_key)
 
-        self.driver = Driver(self.user_params, enclosure=enclosure, radiation_model=radiation_model)
-        self.update_resumen()
+        # Crear driver o sistema bandpass
+        if enclosure_type == "Bandpass Isobárico":
+            # Para bandpass isobárico, usamos su propia simulación
+            self.bandpass_system = enclosure
+            self.driver = None  # No usar Driver normal
+            # Crear resumen personalizado para bandpass
+            self.resumen_text.setPlainText(f"""Sistema Bandpass Isobárico configurado:
+
+=== Configuración de Cámara ===
+Volumen cámara frontal: {self.vb_front_entry.text()} L
+Volumen cámara trasera: {self.vab_entry.text()} L
+
+=== Configuración de Puerto ===
+Frecuencia de sintonía: {self.fp_entry.text()} Hz
+Diámetro diafragma: {self.dd_entry.text()} m
+Diámetro puerto: {self.dp_entry.text()} m
+Longitud puerto: {self.lp_entry.text()} m
+
+=== Parámetros Isobáricos ===
+Inductancia de bobina: {self.lvc_entry.text()} mH
+Masa del diafragma: {self.mmd_entry.text()} kg
+
+=== Parámetros del Driver (desde campos principales) ===
+Re = {self.user_params['Re']} Ω
+Qes = {self.user_params['Qes']}
+Qms = {self.user_params['Qms']}
+Fs = {self.user_params['Fs']} Hz
+Bl = {self.user_params['Bl']} N/A
+Sd = {self.user_params['Sd']} m²
+
+Nota: Los parámetros del driver se toman de los campos principales,
+no hay duplicación de parámetros.""")
+        else:
+            # Para otros tipos, usar Driver normal
+            self.driver = Driver(self.user_params, enclosure=enclosure, radiation_model=radiation_model)
+            self.bandpass_system = None
+            self.update_resumen()
+            
         self.update_plots()
 
     def update_resumen(self):
-        resumen = self.driver.resumen_parametros()
-        self.resumen_text.setPlainText(resumen)
+        if hasattr(self, 'driver') and self.driver is not None:
+            resumen = self.driver.resumen_parametros()
+            self.resumen_text.setPlainText(resumen)
+        # Para bandpass, el resumen ya se configuró en on_submit()
 
     def export_txt(self):
         if not hasattr(self, "driver") or self.driver is None:
@@ -340,28 +419,85 @@ class AppQt(QMainWindow):
         nombre_driver = self.sim_names[-1]
         self.plot_count += 1
 
-        f_max = self.driver.f_max_ka()
-        frequencies = np.logspace(np.log10(5), np.log10(f_max), 1000)
-        Z_values = np.array([self.driver.impedance(f) for f in frequencies])
-        Z_magnitude = np.abs(Z_values)
-        Z_phase = np.angle(Z_values, deg=True)
-        SPL_total = np.array([self.driver.spl_total(f) for f in frequencies])
-        SPL_phase = np.array([self.driver.spl_phase(f) for f in frequencies])
-        displacements = np.array([self.driver.displacement(f) for f in frequencies])
-        displacements_mm = displacements * 1000
-        velocities = np.array([abs(self.driver.velocity(f)) for f in frequencies])
-        P_real = np.array([self.driver.power_real(f) for f in frequencies])
-        P_reactiva = np.array([self.driver.power_reactive(f) for f in frequencies])
-        P_aparente = np.array([self.driver.power_apparent(f) for f in frequencies])
-        P_ac = np.array([self.driver.power_ac(f) for f in frequencies])
-        group_delay_vals = -self.driver.group_delay_array(frequencies)
-        Fs = abs(self.driver.Fs) if self.driver.Fs != 0 else 1e-6
-        T0 = 1 / Fs
-        t_array = np.linspace(0, 5 * T0, 1000)
-        step_t, step_x, step_v, step_a = self.driver.step_response(t_array)
-        efficiency_val = self.driver.efficiency(frequencies)
-        excursion_mm, excursion_ratio, excursion_peak, cone_force_array, cone_force_peak = self.driver.excursion(frequencies)
-        xmax_mm = self.driver.Xmax
+        if hasattr(self, 'bandpass_system') and self.bandpass_system is not None:
+            # Simulación para Bandpass Isobárico
+            # Calcular f_max basado en ka ≤ 1 usando los parámetros del driver
+            temp_params = {
+                'Re': self.user_params['Re'],
+                'Qes': self.user_params['Qes'], 
+                'Qms': self.user_params['Qms'],
+                'Fs': self.user_params['Fs'],
+                'Bl': self.user_params['Bl'],
+                'Sd': self.user_params['Sd'],
+                'Vas': 0.05,  # valor temporal
+                'Xmax': 7.5   # valor temporal
+            }
+            # Calcular Cms desde Vas temporal
+            rho0, c = 1.2, 344
+            Vas_m3 = temp_params["Vas"] / 1000
+            temp_params["Cms"] = Vas_m3 / (rho0 * c**2 * temp_params["Sd"]**2)
+            temp_driver = Driver(temp_params)
+            f_max_bandpass = temp_driver.f_max_ka(ka_max=1.0)  # Limitar a ka ≤ 1
+            
+            frequencies = np.logspace(np.log10(5), np.log10(f_max_bandpass), 1000)
+            results = self.bandpass_system.simulate(frequencies)
+            
+            # Usar los resultados del sistema bandpass
+            Z_magnitude = results["Zt"]
+            Z_phase = results["ZtΦ"]
+            SPL_total = results["SPL"]
+            SPL_phase = np.zeros_like(SPL_total)  # Bandpass no calcula fase SPL
+            displacements_mm = results["DEZ"]  # DEZ está en mm
+            velocities = np.ones_like(frequencies)  # Placeholder
+            P_real = np.ones_like(frequencies)  # Placeholder
+            P_reactiva = np.ones_like(frequencies)  # Placeholder
+            P_aparente = np.ones_like(frequencies)  # Placeholder
+            P_ac = np.ones_like(frequencies)  # Placeholder
+            group_delay_vals = results["groupdelay"]
+            
+            # Datos para step response (placeholder)
+            t_array = np.linspace(0, 0.1, 1000)
+            step_t = t_array
+            step_x = np.zeros_like(t_array)
+            step_v = np.zeros_like(t_array)
+            step_a = np.zeros_like(t_array)
+            
+            efficiency_val = np.ones_like(frequencies)  # Placeholder
+            excursion_mm = displacements_mm
+            excursion_ratio = np.ones_like(frequencies)
+            excursion_peak = np.max(excursion_mm)
+            cone_force_array = np.ones_like(frequencies)
+            cone_force_peak = 1.0
+            xmax_mm = 7.5  # Usar valor por defecto
+            f_max = f_max_bandpass  # Usar el límite calculado con ka ≤ 1
+            
+        else:
+            # Simulación normal con Driver
+            if self.driver is None:
+                return
+                
+            f_max = self.driver.f_max_ka(ka_max=1.0)  # Limitar a ka ≤ 1
+            frequencies = np.logspace(np.log10(5), np.log10(f_max), 1000)
+            Z_values = np.array([self.driver.impedance(f) for f in frequencies])
+            Z_magnitude = np.abs(Z_values)
+            Z_phase = np.angle(Z_values, deg=True)
+            SPL_total = np.array([self.driver.spl_total(f) for f in frequencies])
+            SPL_phase = np.array([self.driver.spl_phase(f) for f in frequencies])
+            displacements = np.array([self.driver.displacement(f) for f in frequencies])
+            displacements_mm = displacements * 1000
+            velocities = np.array([abs(self.driver.velocity(f)) for f in frequencies])
+            P_real = np.array([self.driver.power_real(f) for f in frequencies])
+            P_reactiva = np.array([self.driver.power_reactive(f) for f in frequencies])
+            P_aparente = np.array([self.driver.power_apparent(f) for f in frequencies])
+            P_ac = np.array([self.driver.power_ac(f) for f in frequencies])
+            group_delay_vals = -self.driver.group_delay_array(frequencies)
+            Fs = abs(self.driver.Fs) if self.driver.Fs != 0 else 1e-6
+            T0 = 1 / Fs
+            t_array = np.linspace(0, 5 * T0, 1000)
+            step_t, step_x, step_v, step_a = self.driver.step_response(t_array)
+            efficiency_val = self.driver.efficiency(frequencies)
+            excursion_mm, excursion_ratio, excursion_peak, cone_force_array, cone_force_peak = self.driver.excursion(frequencies)
+            xmax_mm = self.driver.Xmax
 
         # --- Grid 3x3 ---
         # Mantén la figura y ejes entre simulaciones
@@ -372,8 +508,18 @@ class AppQt(QMainWindow):
             fig = self.fig
             axs = self.axs
 
+        # Determinar qué driver usar para plot_all
+        if hasattr(self, 'bandpass_system') and self.bandpass_system is not None:
+            # Para bandpass, crear un objeto pseudo-driver para plot_all
+            class PseudoDriver:
+                def __init__(self):
+                    pass
+            plot_driver = PseudoDriver()
+        else:
+            plot_driver = self.driver
+
         lines, cursor = plot_all(
-            self.driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
+            plot_driver, frequencies, Z_magnitude, Z_phase, SPL_total, SPL_phase,
             displacements_mm, velocities, P_real, P_reactiva, P_aparente, P_ac, group_delay_vals, step_t, step_x, step_v,
             step_a, efficiency_val, excursion_mm, excursion_ratio, excursion_peak, cone_force_array, cone_force_peak, xmax_mm, f_max,
             fig=fig, axs=axs, linestyle=linestyle, label=nombre_driver,

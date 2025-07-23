@@ -320,7 +320,18 @@ def plot_all(                                                                   
     # Ajustes finales de los ejes
     # -------------------------------
 
-    custom_ticks = [10, 100, 1000, 10000, 15000, 20000]
+    # Ticks personalizados que se ajustan al f_max real
+    base_ticks = [10, 100, 1000]
+    if f_max > 2000:
+        base_ticks.extend([2000, 5000])
+    if f_max > 10000:
+        base_ticks.extend([10000, 15000, 20000])
+    
+    # Asegurar que f_max esté incluido como tick si es significativo
+    if f_max > base_ticks[-1]:
+        base_ticks.append(int(f_max))
+    
+    custom_ticks = [tick for tick in base_ticks if tick <= f_max * 1.2]
 
     def fmt_ticks(x, pos):
         if x == 0:

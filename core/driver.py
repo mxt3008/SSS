@@ -131,7 +131,6 @@ class Driver:
 
         =======================================
         """)
-        print(self.resumen_parametros())
 
 #====================================================================================================================================
 #====================================================================================================================================
@@ -351,6 +350,71 @@ class Driver:
         v = I * (self.Bl / Zm)                              # Velocidad real del diafragma [m/s]
 
         return v
+
+#====================================================================================================================================
+    # ===============================
+    # 4b. Velocidad de volumen
+    # ===============================
+
+    def volume_velocity(self, f, U=2.83):
+        """
+        Calcula la velocidad de volumen (flujo volumétrico) del diafragma.
+        
+        La velocidad de volumen es el producto de la velocidad del diafragma 
+        por el área efectiva: Q = v × Sd
+        
+        Args:
+            f: Frecuencia en Hz (escalar o array)
+            U: Voltaje RMS aplicado en V (por defecto 2.83V para 1W en 8Ω)
+            
+        Returns:
+            Q: Velocidad de volumen en m³/s (compleja)
+        """
+        if np.any(np.asarray(f) <= 0):
+            raise ValueError("La frecuencia debe ser mayor que cero para calcular la velocidad de volumen.")
+
+        v = self.velocity(f, U)                             # Velocidad del diafragma [m/s]
+        Q = v * self.Sd                                     # Velocidad de volumen [m³/s]
+        
+        return Q
+
+    def volume_velocity_magnitude(self, f, U=2.83):
+        """
+        Calcula la magnitud de la velocidad de volumen.
+        
+        Args:
+            f: Frecuencia en Hz (escalar o array)
+            U: Voltaje RMS aplicado en V
+            
+        Returns:
+            |Q|: Magnitud de la velocidad de volumen en m³/s
+        """
+        Q = self.volume_velocity(f, U)
+        return np.abs(Q)
+
+    def volume_velocity_phase(self, f, U=2.83):
+        """
+        Calcula la fase de la velocidad de volumen.
+        
+        Args:
+            f: Frecuencia en Hz (escalar o array)
+            U: Voltaje RMS aplicado en V
+            
+        Returns:
+            Fase de la velocidad de volumen en grados
+        """
+        Q = self.volume_velocity(f, U)
+        phase_rad = np.angle(Q)
+        
+        if np.isscalar(f):
+            # Entrada escalar → no usar unwrap
+            phase_deg = np.degrees(phase_rad)
+        else:
+            # Entrada vectorial → usar unwrap
+            phase_unwrapped = np.unwrap(phase_rad)
+            phase_deg = np.degrees(phase_unwrapped)
+            
+        return phase_deg
     
 #====================================================================================================================================
     # ===============================
