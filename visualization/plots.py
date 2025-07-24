@@ -26,7 +26,8 @@ def plot_all(                                                                   
     f_max,                                                                                                      # Frecuencia máxima
     fig=None, axs=None, linestyle="-", label="Simulación", show_legend=True,                                    # Parámetros de visualización
     enable_cursor=False,                                                                                        # Habilitar cursor interactivo
-    grid_cursor=None                                                                                            # Cursor de cuadrícula para interactividad
+    grid_cursor=None,                                                                                           # Cursor de cuadrícula para interactividad
+    SPL_cone=None, SPL_port=None                                                                                # SPL separado para bass-reflex
 ):
     title_fontsize = 8                                                                                          # Tamaño de fuente del título
     label_fontsize = 7                                                                                          # Tamaño de fuente de las etiquetas
@@ -112,7 +113,23 @@ def plot_all(                                                                   
 
     axs[1].set_title("Respuesta SPL y Fase", fontsize=title_fontsize, fontweight='bold')                            # Título de la gráfica de SPL
     ax_spl = axs[1]                                                                                                 # Eje principal para SPL
-    ln3, = ax_spl.semilogx(frequencies, SPL_total, color="cadetblue", linestyle=linestyle, label=f"SPL Total - {label}")    # Magnitud del SPL
+    
+    # Verificar si es bass-reflex y hay datos separados
+    is_bassreflex = (SPL_cone is not None and SPL_port is not None and 
+                    hasattr(my_driver, 'enclosure') and my_driver.enclosure is not None and
+                    hasattr(my_driver.enclosure, '__class__') and 'BassReflex' in my_driver.enclosure.__class__.__name__)
+    
+    if is_bassreflex:
+        # Mostrar las tres curvas separadas para bass-reflex
+        ln3a, = ax_spl.semilogx(frequencies, SPL_cone, color="blue", linestyle=linestyle, linewidth=2, label=f"SPL Cono - {label}")
+        ln3b, = ax_spl.semilogx(frequencies, SPL_port, color="red", linestyle=linestyle, linewidth=2, label=f"SPL Puerto - {label}")
+        ln3c, = ax_spl.semilogx(frequencies, SPL_total, color="cyan", linestyle=linestyle, linewidth=3, label=f"SPL Total - {label}")
+        lns_spl = [ln3a, ln3b, ln3c]
+    else:
+        # Mostrar solo SPL total para otros tipos de caja
+        ln3, = ax_spl.semilogx(frequencies, SPL_total, color="cadetblue", linestyle=linestyle, label=f"SPL Total - {label}")
+        lns_spl = [ln3]
+    
     ln4, = twin1.semilogx(frequencies, SPL_phase, color="chocolate", linestyle=linestyle, label=f"Fase SPL [°] - {label}")  # Fase del SPL
     ax_spl.set_ylabel("SPL [dB]", color='cadetblue', fontsize=label_fontsize, labelpad=2)                                   # Etiqueta del eje y para el SPL
     twin1.set_ylabel("Fase [°]", color='chocolate', fontsize=label_fontsize, labelpad=2)                                    # Etiqueta del eje y para la fase del SPL
@@ -121,12 +138,12 @@ def plot_all(                                                                   
     twin1.yaxis.set_label_coords(1.115, 0.5)                                                                        # Ajusta la posición de la etiqueta del eje y de fase
     twin1.set_ylim(-180, 180)                                                                                       # Limita el eje y de fase entre -180 y 180 grados
 
-    lns_spl_phase = [ln3, ln4]                                                                                      # Lista de líneas para la leyenda de SPL
+    lns_spl_phase = lns_spl + [ln4]                                                                                 # Lista de líneas para la leyenda de SPL
     labs_spl_phase = [l.get_label() for l in lns_spl_phase]                                                         # Obtiene las etiquetas de las líneas de fase 
     ax_spl.legend(lns_spl_phase, labs_spl_phase, loc='best', fontsize=label_fontsize)                               # Añade la leyenda a la gráfica e SPL
     ax_spl.set_xlabel("Frecuencia [Hz]", fontsize=label_fontsize, labelpad=2)                                       # Etiqueta del eje x
     ax_spl.tick_params(axis='x', labelsize=tick_fontsize)                                                           # Configuración de las marcas del eje x
-    lines.extend([ln3, ln4])                                                                                        # Añade las líneas de SPL a la lista de líneas 
+    lines.extend(lns_spl_phase)                                                                                     # Añade las líneas de SPL a la lista de líneas 
 
     ax1.grid(True, which="both")                                                                                    # 
     ax_spl.grid(True, which="both")                                                                                 # 

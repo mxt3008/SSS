@@ -121,10 +121,8 @@ class BandpassIsobaricBox:
         }
     
     def total_acoustic_load(self, f, Sd):
-        """
-        Método de compatibilidad con la clase Driver.
-        Devuelve la impedancia acústica total vista por el driver.
-        """
+        # Método de compatibilidad con la clase Driver.
+        # Devuelve la impedancia acústica total vista por el driver.
         # Simplificación: devolver impedancia acústica basada en los cálculos internos
         # Para una implementación más completa, esto debería usar los cálculos 
         # de impedancia del sistema bandpass isobárico

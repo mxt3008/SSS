@@ -3,7 +3,7 @@
 # Definición rigurosa del entorno acústico. Cada constante se deriva desde principios físicos fundamentales.
 # --------------------------------------------
 
-import numpy as np
+import numpy as np                                                      # Importa numpy para cálculos matemáticos
 
 #====================================================================================================================================
 #====================================================================================================================================
@@ -12,45 +12,19 @@ import numpy as np
 class AcousticEnvironment:
 
     def __init__(self, T0: float = 293.15, P0: float = 101325.0, gamma: float = 1.4, M: float = 0.02896):
-    #====================================================================================================================================
-    # T0    : Temperatura ambiente en Kelvin (default: 293.15 K = 20°C)
-    # P0    : Presión atmosférica en Pascales (default: 101325 Pa)
-    # gamma : Coeficiente adiabático del aire seco (≈1.4)
-    # M     : Masa molar del aire seco en kg/mol (≈28.96 g/mol)
-    #====================================================================================================================================
+        
+        self.R_universal = 8.3145                                       # Constante universal de los gases en J/mol·K
 
-        # ----------------------------------------
-        # Constante universal de los gases
-        # ----------------------------------------
-        self.R_universal = 8.3145                       # [J/mol·K]
+        self.M = M                                                      # Masa molar del aire seco en kg/mol
+        self.R = self.R_universal / self.M                              # Constante específica del aire seco R = R_universal / M
 
-        # ----------------------------------------
-        # Constante específica del aire seco
-        # R = R_universal / M
-        # ----------------------------------------
-        self.M = M
-        self.R = self.R_universal / self.M              # [J/kg·K]
+        self.T0 = T0                                                    # Temperatura absoluta en K
+        self.P0 = P0                                                    # Presión atmosférica en Pa
+        self.gamma = gamma                                              # Índice adiabático (Cp/Cv)
 
-        # ----------------------------------------
-        # Parámetros de entrada
-        # ----------------------------------------
-        self.T0 = T0                                     # Temperatura absoluta [K]
-        self.P0 = P0                                     # Presión atmosférica [Pa]
-        self.gamma = gamma                               # Índice adiabático (Cp/Cv)
+        self.rho0 = self.P0 / (self.R * self.T0)                       # Densidad del aire: ρ = P / (R T). Derivada de la ecuación de estado de gas ideal
 
-        # ----------------------------------------
-        # Densidad del aire: ρ = P / (R T). Derivada de la ecuación de estado de gas ideal.
-        # ----------------------------------------
-        self.rho0 = self.P0 / (self.R * self.T0)         # [kg/m³]
-
-        # ----------------------------------------
-        # Velocidad del sonido: c = sqrt(γ R T). Derivada de la definición de compresibilidad adiabática.
-        # ----------------------------------------
-        self.c = np.sqrt(self.gamma * self.R * self.T0)  # [m/s]
-
-    # ----------------------------------------
-    # Reporte completo
-    # ----------------------------------------
+        self.c = np.sqrt(self.gamma * self.R * self.T0)                # Velocidad del sonido: c = sqrt(γ R T). Derivada de la definición de compresibilidad adiabática
 
     def resumen(self):
         return f"""
@@ -67,7 +41,7 @@ class AcousticEnvironment:
         Densidad del aire seco     ρ₀   = {self.rho0:.3f} kg/m³
         Velocidad del sonido       c    = {self.c:.2f} m/s
         ===================================================
-        """
+        """                                                             # Retorna resumen formateado de los parámetros del entorno
     
 #====================================================================================================================================
 #====================================================================================================================================

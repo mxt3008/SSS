@@ -471,6 +471,10 @@ no hay duplicación de parámetros.""")
             xmax_mm = 7.5  # Usar valor por defecto
             f_max = f_max_bandpass  # Usar el límite calculado con ka ≤ 1
             
+            # Para bandpass no hay SPL separado
+            SPL_cone = None
+            SPL_port = None
+            
         else:
             # Simulación normal con Driver
             if self.driver is None:
@@ -483,6 +487,15 @@ no hay duplicación de parámetros.""")
             Z_phase = np.angle(Z_values, deg=True)
             SPL_total = np.array([self.driver.spl_total(f) for f in frequencies])
             SPL_phase = np.array([self.driver.spl_phase(f) for f in frequencies])
+            
+            # Calcular SPL separado solo para bass-reflex
+            SPL_cone = None
+            SPL_port = None
+            if (hasattr(self.driver, 'enclosure') and self.driver.enclosure is not None and
+                hasattr(self.driver.enclosure, '__class__') and 'BassReflex' in self.driver.enclosure.__class__.__name__):
+                SPL_cone = np.array([self.driver.spl_bassreflex_cone(f) for f in frequencies])
+                SPL_port = np.array([self.driver.spl_bassreflex_port(f) for f in frequencies])
+            
             displacements = np.array([self.driver.displacement(f) for f in frequencies])
             displacements_mm = displacements * 1000
             velocities = np.array([abs(self.driver.velocity(f)) for f in frequencies])
@@ -525,7 +538,8 @@ no hay duplicación de parámetros.""")
             fig=fig, axs=axs, linestyle=linestyle, label=nombre_driver,
             show_legend=self.show_legends,
             enable_cursor=self.enable_grid_cursor,
-            grid_cursor=self.grid_cursor
+            grid_cursor=self.grid_cursor,
+            SPL_cone=SPL_cone, SPL_port=SPL_port
         )
         self.fig = plt.gcf()
         self.axs = np.array(self.fig.axes)
