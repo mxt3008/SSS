@@ -118,10 +118,16 @@ class AppQt(QMainWindow):
 
         # Pestañas individuales
         self.single_plot_tabs = []
+        tab_names = [
+            "Impedancia", "SPL", "Desplazamiento", 
+            "Velocidad", "Potencia", "Group Delay",
+            "Step Response", "Eficiencia", "Excursión"
+        ]
         for i in range(9):
             tab = QWidget()
             layout = QVBoxLayout(tab)
-            self.tabs.addTab(tab, f"Gráfica {i+1}")
+            tab_name = tab_names[i] if i < len(tab_names) else f"Gráfica {i+1}"
+            self.tabs.addTab(tab, tab_name)
             self.single_plot_tabs.append((tab, layout))
 
         # --- Estado de la figura ---
@@ -387,31 +393,38 @@ no hay duplicación de parámetros.""")
 
     def toggle_grid_cursor(self):
         self.enable_grid_cursor = not self.enable_grid_cursor
-        # Solo activa/desactiva el cursor, NO generes una nueva simulación
-        if self.enable_grid_cursor:
-            # Activa el cursor grid en la figura actual
-            import mplcursors
-            if hasattr(self, "grid_cursor") and self.grid_cursor is not None:
-                try:
-                    self.grid_cursor.remove()
-                except Exception:
-                    pass
-            all_lines = []
-            for ax in self.axs:
-                all_lines.extend(ax.get_lines())
-                for other in ax.figure.axes:
-                    if other is not ax and getattr(other, "_sharex", None) is ax:
-                        all_lines.extend(other.get_lines())
-            self.grid_cursor = mplcursors.cursor(all_lines, hover=True)
-            # Puedes definir aquí el formato del cursor si lo deseas
-        else:
-            # Desactiva el cursor grid
-            if hasattr(self, "grid_cursor") and self.grid_cursor is not None:
-                try:
-                    self.grid_cursor.remove()
-                except Exception:
-                    pass
-                self.grid_cursor = None
+        
+        # Actualizar cursor en grid principal
+        if self.fig is not None and self.axs is not None:
+            if self.enable_grid_cursor:
+                # Activa el cursor grid en la figura principal
+                import mplcursors
+                if hasattr(self, "grid_cursor") and self.grid_cursor is not None:
+                    try:
+                        self.grid_cursor.remove()
+                    except Exception:
+                        pass
+                all_lines = []
+                for ax in self.axs:
+                    all_lines.extend(ax.get_lines())
+                    for other in ax.figure.axes:
+                        if other is not ax and getattr(other, "_sharex", None) is ax:
+                            all_lines.extend(other.get_lines())
+                if all_lines:
+                    self.grid_cursor = mplcursors.cursor(all_lines, hover=True)
+                    from visualization.plots import cursor_fmt
+                    self.grid_cursor.connect("add", cursor_fmt)
+            else:
+                # Desactiva el cursor grid
+                if hasattr(self, "grid_cursor") and self.grid_cursor is not None:
+                    try:
+                        self.grid_cursor.remove()
+                    except Exception:
+                        pass
+                    self.grid_cursor = None
+        
+        # Actualizar cursores en pestañas individuales
+        # (Se maneja automáticamente en update_plots cuando se recrean las pestañas)
 
     def update_plots(self):
         linestyles = ["-", "--", "-.", ":"]
@@ -591,6 +604,17 @@ no hay duplicación de parámetros.""")
                 if hasattr(other_ax, "spines") and "right" in other_ax.spines:
                     if np.allclose(other_ax.get_position().bounds, orig_ax.get_position().bounds):
                         twins.append(other_ax)
+            
+            # Lista para almacenar todas las líneas para la leyenda combinada
+            all_legend_lines = []
+            all_legend_labels = []
+            
+            # Agregar líneas del eje principal
+            for line in orig_ax.get_lines():
+                if line.get_label() and not line.get_label().startswith('_'):
+                    all_legend_lines.append(line)
+                    all_legend_labels.append(line.get_label())
+            
             for idx, orig_twin in enumerate(twins):
                 twin = ax_single.twinx()
                 orig_pos = orig_twin.spines["right"].get_position()
@@ -604,14 +628,20 @@ no hay duplicación de parámetros.""")
                 twin.set_ylim(orig_twin.get_ylim())
                 twin.set_ylabel(orig_twin.get_ylabel())
                 twin.tick_params(axis='y', labelcolor=orig_twin.yaxis.get_label().get_color())
+                
+                # Copiar líneas del twin y agregarlas a la leyenda combinada
                 for line in orig_twin.get_lines():
-                    twin.plot(line.get_xdata(), line.get_ydata(),
+                    twin_line = twin.plot(line.get_xdata(), line.get_ydata(),
                               color=line.get_color(),
                               linestyle=line.get_linestyle(),
                               label=line.get_label(),
-                              visible=line.get_visible())
-                if len(orig_twin.get_lines()) > 0:
-                    twin.legend(fontsize=8, loc="upper right")
+                              visible=line.get_visible())[0]
+                    
+                    # Agregar a la leyenda combinada si tiene etiqueta válida
+                    if line.get_label() and not line.get_label().startswith('_'):
+                        all_legend_lines.append(twin_line)
+                        all_legend_labels.append(line.get_label())
+                
                 # --- DESACTIVA la grilla en los twins ---
                 twin.grid(False)
                 twin.yaxis.grid(False, which='both')
@@ -619,25 +649,42 @@ no hay duplicación de parámetros.""")
                 for gridline in twin.get_ygridlines() + twin.get_xgridlines():
                     gridline.set_visible(False)
 
+            # Crear leyenda combinada con todas las líneas
+            if all_legend_lines:
+                ax_single.legend(all_legend_lines, all_legend_labels, fontsize=8, loc="best")
+            elif len(orig_ax.get_lines()) > 0:
+                ax_single.legend(fontsize=8, loc="best")
+
             canvas_single = FigureCanvas(fig_single)
             layout.addWidget(canvas_single)
             fig_single.tight_layout()
-            canvas_single.draw()
+            
             # --- Cursor grid en pestañas individuales ---
             if self.enable_grid_cursor:
                 import mplcursors
                 from visualization.plots import cursor_fmt
-                all_lines = []
-                for ax in fig_single.axes:
-                    all_lines.extend(ax.get_lines())
-                cursor = mplcursors.cursor(all_lines, hover=True)
-                cursor.connect("add", cursor_fmt)
+                all_lines_tab = []
+                for ax_tab in fig_single.axes:
+                    all_lines_tab.extend(ax_tab.get_lines())
+                if all_lines_tab:  # Solo crear cursor si hay líneas
+                    cursor_tab = mplcursors.cursor(all_lines_tab, hover=True)
+                    cursor_tab.connect("add", cursor_fmt)
+                    # Almacenar referencia para evitar garbage collection
+                    canvas_single._cursor_tab = cursor_tab
+            
             # --- Doble clic para maximizar ---
             def on_double_click(event, orig_ax=orig_ax):
                 if event.dblclick:
                     from visualization.plots import maximize_subplot
                     maximize_subplot(orig_ax, event)
             canvas_single.mpl_connect("button_press_event", on_double_click)
+            
+            canvas_single.draw()  # MOVER EL DRAW DESPUÉS DEL CURSOR
+            
+            # Asegurar que el cursor funcione después del draw
+            if self.enable_grid_cursor and hasattr(canvas_single, '_cursor_tab'):
+                canvas_single._cursor_tab.enabled = True
+            
             plt.close(fig_single)
 
         # --- Checkboxes ---

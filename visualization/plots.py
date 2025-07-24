@@ -516,117 +516,121 @@ def plot_all(                                                                   
 # -------------------------------
 
 def maximize_subplot(ax, event):
-    import mplcursors
-    import numpy as np
-    import matplotlib.ticker as ticker
-    from matplotlib.ticker import MultipleLocator, LogLocator, ScalarFormatter
-
-    fig = plt.figure(figsize=(8, 6))
-    new_ax = fig.add_subplot(111)
-
-    # Copiar líneas del eje principal
-    for line in ax.get_lines():
-        x = line.get_xdata()
-        y = line.get_ydata()
-        label = line.get_label()
-        if np.allclose(y, y[0]):
-            new_ax.axhline(
-                y=y[0],
-                color=line.get_color(),
-                linestyle=line.get_linestyle(),
-                linewidth=line.get_linewidth(),
-                label=label
-            )
-        else:
-            new_ax.plot(
-                x, y,
-                color=line.get_color(),
-                linestyle=line.get_linestyle(),
-                label=label,
-                visible=line.get_visible()
-            )
-
-    # --- Copiar TODOS los twins asociados a este subplot ---
-    twins = []
-    for other_ax in ax.figure.axes:
-        if other_ax is not ax and hasattr(other_ax, "spines") and "right" in other_ax.spines:
-            # Compara la posición del eje para asegurarse que es twin del subplot
-            if np.allclose(other_ax.get_position().bounds, ax.get_position().bounds):
-                twins.append(other_ax)
-
-    for idx, orig_twin in enumerate(twins):
-        twin = new_ax.twinx()
-        orig_pos = orig_twin.spines["right"].get_position()
-        if orig_pos != ('outward', 0.0):
-            twin.spines["right"].set_position(orig_pos)
-            twin.set_frame_on(True)
-            twin.patch.set_visible(False)
-        twin.set_xscale(orig_twin.get_xscale())
-        twin.set_yscale(orig_twin.get_yscale())
-        twin.set_xlim(orig_twin.get_xlim())
-        twin.set_ylim(orig_twin.get_ylim())
-        twin.set_ylabel(orig_twin.get_ylabel(), fontsize=9)
-        twin.tick_params(axis='y', labelcolor=orig_twin.yaxis.get_label().get_color())
-        for line in orig_twin.get_lines():
-            twin.plot(line.get_xdata(), line.get_ydata(),
-                      color=line.get_color(),
-                      linestyle=line.get_linestyle(),
-                      label=line.get_label(),
-                      visible=line.get_visible())
-        if len(orig_twin.get_lines()) > 0:
-            twin.legend(fontsize=9, loc="upper right")
-    if not twins:
-        new_ax.legend(fontsize=9)
-
-    # Título y etiquetas
-    title = ax.get_title() or "Gráfica"
-    new_ax.set_title(title, fontsize=10, fontweight='bold')
-    new_ax.set_xlabel(ax.get_xlabel(), fontsize=9)
-    new_ax.set_ylabel(ax.get_ylabel(), fontsize=9)
-    new_ax.grid(True, which="both")
-    xscale = ax.get_xscale()
-    new_ax.set_xscale(xscale)
-
-    if xscale == 'log':
-        new_ax.xaxis.set_major_locator(LogLocator(base=10.0, numticks=12))
-        new_ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs='auto', numticks=12))
-        new_ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f"{x/1000:.0f}k" if x >= 1000 else f"{x:.0f}"))
-    else:
-        new_ax.xaxis.set_major_locator(MultipleLocator(100))
-        new_ax.xaxis.set_major_formatter(ScalarFormatter())
-        new_ax.tick_params(axis='both', labelsize=8)
+    """Maximiza un subplot individual en una nueva ventana"""
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+    from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QWidget
+    import sys
     
-    if "SPL" in new_ax.get_title():
-        new_ax.yaxis.set_major_locator(MultipleLocator(10))
-
-    # --- Cursor grid en la ventana maximizada ---
-    from visualization.plots import cursor_fmt
-    all_lines = []
-    all_lines.extend(new_ax.get_lines())
-    for twin in fig.axes:
-        if twin is not new_ax:
-            all_lines.extend(twin.get_lines())
-    cursor = mplcursors.cursor(all_lines, hover=True)
-    cursor.connect("add", cursor_fmt)
-
-    # Mostrar/ocultar leyendas según el estado global
-    try:
-        from PyQt5.QtWidgets import QApplication
-        import matplotlib._pylab_helpers
-        for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers():
-            # Busca la última instancia de AppQt (ventana principal)
-            for widget in QApplication.topLevelWidgets():
-                if hasattr(widget, "show_legends"):
-                    show_legends = widget.show_legends
-                    from visualization.plots import toggle_legends_on_figure
-                    toggle_legends_on_figure(fig, show_legends)
-                    break
-    except Exception:
-        pass
-
-    fig.tight_layout()
-    fig.show()
-    fig.canvas.draw_idle()
+    # Crear una nueva ventana Qt independiente
+    class MaximizedWindow(QMainWindow):
+        def __init__(self, ax_source):
+            super().__init__()
+            self.setWindowTitle(f"Gráfica Maximizada: {ax_source.get_title()}")
+            self.setGeometry(100, 100, 1200, 800)
+            
+            # Widget central
+            central_widget = QWidget()
+            self.setCentralWidget(central_widget)
+            layout = QVBoxLayout(central_widget)
+            
+            # Crear figura matplotlib
+            fig_max = plt.figure(figsize=(12, 8))
+            canvas = FigureCanvas(fig_max)
+            layout.addWidget(canvas)
+            
+            # Crear el subplot maximizado
+            ax_max = fig_max.add_subplot(111)
+            
+            # Copiar propiedades del eje principal
+            ax_max.set_xscale(ax_source.get_xscale())
+            ax_max.set_yscale(ax_source.get_yscale())
+            ax_max.set_xlim(ax_source.get_xlim())
+            ax_max.set_ylim(ax_source.get_ylim())
+            ax_max.set_xlabel(ax_source.get_xlabel())
+            ax_max.set_ylabel(ax_source.get_ylabel())
+            ax_max.set_title(ax_source.get_title())
+            ax_max.grid(True, which="both", alpha=0.3)
+            
+            # Lista para leyenda combinada
+            all_legend_lines = []
+            all_legend_labels = []
+            
+            # Copiar líneas del eje principal
+            for line in ax_source.get_lines():
+                new_line = ax_max.plot(line.get_xdata(), line.get_ydata(),
+                                      color=line.get_color(),
+                                      linestyle=line.get_linestyle(),
+                                      linewidth=line.get_linewidth(),
+                                      marker=line.get_marker(),
+                                      markersize=line.get_markersize(),
+                                      label=line.get_label(),
+                                      visible=line.get_visible())[0]
+                
+                if line.get_label() and not line.get_label().startswith('_'):
+                    all_legend_lines.append(new_line)
+                    all_legend_labels.append(line.get_label())
+            
+            # Buscar y copiar ejes twins
+            twins_data = []
+            for other_ax in ax_source.figure.axes:
+                if other_ax is ax_source:
+                    continue
+                if hasattr(other_ax, "spines") and "right" in other_ax.spines:
+                    if np.allclose(other_ax.get_position().bounds, ax_source.get_position().bounds):
+                        twins_data.append(other_ax)
+            
+            # Crear twins en la figura maximizada
+            for twin_orig in twins_data:
+                twin_max = ax_max.twinx()
+                
+                twin_max.set_yscale(twin_orig.get_yscale())
+                twin_max.set_ylim(twin_orig.get_ylim())
+                twin_max.set_ylabel(twin_orig.get_ylabel())
+                twin_max.tick_params(axis='y', labelcolor=twin_orig.yaxis.get_label().get_color())
+                
+                orig_pos = twin_orig.spines["right"].get_position()
+                if orig_pos != ('outward', 0.0):
+                    twin_max.spines["right"].set_position(orig_pos)
+                    twin_max.set_frame_on(True)
+                    twin_max.patch.set_visible(False)
+                
+                for line in twin_orig.get_lines():
+                    twin_line = twin_max.plot(line.get_xdata(), line.get_ydata(),
+                                             color=line.get_color(),
+                                             linestyle=line.get_linestyle(),
+                                             linewidth=line.get_linewidth(),
+                                             marker=line.get_marker(),
+                                             markersize=line.get_markersize(),
+                                             label=line.get_label(),
+                                             visible=line.get_visible())[0]
+                    
+                    if line.get_label() and not line.get_label().startswith('_'):
+                        all_legend_lines.append(twin_line)
+                        all_legend_labels.append(line.get_label())
+                
+                twin_max.grid(False)
+            
+            # Crear leyenda combinada
+            if all_legend_lines:
+                ax_max.legend(all_legend_lines, all_legend_labels, fontsize=10, loc="best")
+            
+            # Copiar formateadores
+            ax_max.xaxis.set_major_formatter(ax_source.xaxis.get_major_formatter())
+            ax_max.xaxis.set_major_locator(ax_source.xaxis.get_major_locator())
+            ax_max.yaxis.set_major_formatter(ax_source.yaxis.get_major_formatter())
+            ax_max.yaxis.set_major_locator(ax_source.yaxis.get_major_locator())
+            
+            fig_max.tight_layout()
+            canvas.draw()
+    
+    # Crear y mostrar la ventana maximizada
+    max_window = MaximizedWindow(ax)
+    max_window.show()
+    
+    # Mantener referencia para evitar garbage collection
+    if not hasattr(maximize_subplot, '_windows'):
+        maximize_subplot._windows = []
+    maximize_subplot._windows.append(max_window)
 
 def cursor_fmt(sel):
     y_unit = ""

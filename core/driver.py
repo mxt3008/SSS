@@ -207,8 +207,6 @@ class Driver:
     def impedance(self, f):
         w = 2 * np.pi * f
 
-        # --- MODELO CLÁSICO THIELE-SMALL ---
-        
         # Impedancia eléctrica base
         if self.Reh:
             Z_le = 1 / (1j*w*self.Le + 1/self.Reh)
@@ -217,84 +215,93 @@ class Driver:
         
         Ze_base = self.Re + self.Rg + Z_le
         
-        # Frecuencia de resonancia modificada por la caja
+        # ===== INFINITE BAFFLE =====
         if self.enclosure is None:
-            # Driver libre
-            fs_system = self.Fs
-            Qts_system = self.Qts
-        else:
-            # Driver en caja
-            if hasattr(self.enclosure, '__class__') and 'Sealed' in self.enclosure.__class__.__name__:
-                # Caja sellada: aumenta la frecuencia de resonancia
-                alpha = 1 + self.Vas / (self.enclosure.Vb_m3 * 1000)  # Vas en litros
-                fs_system = self.Fs * np.sqrt(alpha)
-                Qts_system = self.Qts * np.sqrt(alpha)
-                
-            elif hasattr(self.enclosure, '__class__') and 'BassReflex' in self.enclosure.__class__.__name__:
-                # BASS-REFLEX MODELO VITUIXCAD - VALORES EXACTOS SEGÚN IMÁGENES
-                
-                fb = getattr(self.enclosure, 'fp', 50)  # Frecuencia del puerto
-                
-                # Frecuencias exactas según VituixCAD
-                f1 = 22.0      # Primera resonancia (pico bajo) - exacto según imagen
-                f2 = 92.0      # Segunda resonancia (pico alto) - exacto según imagen
-                f_valley = 55.0 # Frecuencia del valle (entre picos)
-                
-                w1 = 2 * np.pi * f1
-                w2 = 2 * np.pi * f2
-                w_valley = 2 * np.pi * f_valley
-                
-                # Factores Q ajustados según la forma en VituixCAD
-                Q1 = 0.6    # Pico moderadamente ancho
-                Q2 = 0.7    # Pico moderadamente ancho
-                
-                # Impedancia mecánica base
-                Ze_mech_base = self.Bl**2 / self.Rms
-                
-                # Primera resonancia (58Ω en 22Hz según VituixCAD)
-                denom1 = 1 + 1j*Q1*(w/w1 - w1/w)
-                Z1 = Ze_mech_base * 1.65 / denom1  # Factor ajustado para 58Ω exacto
-                
-                # Segunda resonancia (64Ω en 92Hz según VituixCAD)
-                denom2 = 1 + 1j*Q2*(w/w2 - w2/w)
-                Z2 = Ze_mech_base * 1.75 / denom2  # Factor ajustado para 64Ω exacto
-                
-                # Valle más suave entre 22Hz y 92Hz
-                valley_width = 20.0  # Hz - ancho del valle
-                valley_factor = np.exp(-((f - f_valley) / valley_width)**2)
-                Z_valley = -Ze_mech_base * 0.6 * valley_factor  # Valle menos profundo
-                
-                # Impedancia mínima realista
-                Z_min = Ze_base.real * 0.15  # Mínimo 15% de la resistencia base
-                
-                # Combinación total
-                Ze_mechanical = Z1 + Z2 + Z_valley
-                Ze_total = Ze_base + Ze_mechanical
-                
-                # Asegurar valores mínimos realistas
-                Ze_mag = np.abs(Ze_total)
-                Ze_phase = np.angle(Ze_total)
-                
-                if np.isscalar(Ze_mag):
-                    if Ze_mag < Z_min:
-                        Ze_total = Z_min * np.exp(1j * Ze_phase)
+            Zm = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
+            Ze_mechanical = (self.Bl**2) / Zm
+            Ze = Ze_base + Ze_mechanical
+            return Ze
+        
+        # ===== CAJA SELLADA =====
+        elif hasattr(self.enclosure, '__class__') and 'Sealed' in self.enclosure.__class__.__name__:
+            alpha = 1 + self.Vas / (self.enclosure.Vb_m3 * 1000)
+            Cms_sistema = self.Cms / alpha
+            Zm_sistema = self.Rms + 1j*w*self.Mms + 1/(1j*w*Cms_sistema)
+            Ze_mechanical = (self.Bl**2) / Zm_sistema
+            Ze = Ze_base + Ze_mechanical
+            return Ze
+        
+        # ===== BASS-REFLEX - MODELO FÍSICO CORRECTO =====
+        elif hasattr(self.enclosure, '__class__') and 'BassReflex' in self.enclosure.__class__.__name__:
+            # 1. Impedancia mecánica del driver
+            Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
+            
+            # 2. Parámetros de la caja
+            Vb = self.enclosure.Vb_m3  # Volumen en m³
+            Cab = Vb / (self.rho0 * self.c**2)  # Compliancia acústica de la caja
+            
+            # 3. Parámetros del puerto/ducto
+            try:
+                if hasattr(self.enclosure, 'area_ducto'):
+                    Sp = self.enclosure.area_ducto
+                elif hasattr(self.enclosure, 'Sp'):
+                    Sp = self.enclosure.Sp
+                elif hasattr(self.enclosure, 'port_area'):
+                    Sp = self.enclosure.port_area
                 else:
-                    mask_low = Ze_mag < Z_min
-                    if np.any(mask_low):
-                        Ze_total[mask_low] = Z_min * np.exp(1j * Ze_phase[mask_low])
+                    Sp = 0.01  # 10 cm² por defecto
                 
-                return Ze_total
-                
-            else:
-                # Caja genérica
-                fs_system = self.Fs
-                Qts_system = self.Qts
+                if hasattr(self.enclosure, 'largo_ducto'):
+                    L = self.enclosure.largo_ducto
+                elif hasattr(self.enclosure, 'L'):
+                    L = self.enclosure.L
+                elif hasattr(self.enclosure, 'port_length'):
+                    L = self.enclosure.port_length
+                else:
+                    L = 0.1  # 10 cm por defecto
+            except:
+                Sp = 0.01
+                L = 0.1
+            
+            # 4. Cálculo correcto de parámetros del puerto
+            delta_L = 0.85 * np.sqrt(Sp/np.pi)  # Corrección de longitud
+            Leff = L + delta_L                   # Longitud efectiva
+            
+            # MODELO CORRECTO: Todo en el lado acústico, luego transformar
+            # Masa acústica del puerto
+            Map = self.rho0 * Leff / Sp  # kg/m⁴
+            
+            # Resistencia acústica del puerto
+            Rap = self.rho0 * self.c * 0.01 / Sp  # Factor de pérdidas pequeño
+            
+            # 5. MODELO BASS-REFLEX CORRECTO
+            # Impedancia acústica de la caja
+            Zab = 1 / (1j*w*Cab)  # Impedancia acústica de la caja
+            
+            # Impedancia acústica del puerto
+            Zap = Rap + 1j*w*Map  # Impedancia acústica del puerto
+            
+            # 6. ACOPLAMIENTO ACÚSTICO CORRECTO
+            # La caja y el puerto están en paralelo acústico
+            Za_paralelo = (Zab * Zap) / (Zab + Zap)
+            
+            # Transformar al lado mecánico (multiplicar por Sd²)
+            Zm_carga_posterior = Za_paralelo * (self.Sd**2)
+            
+            # 7. Impedancia mecánica total
+            Zm_total = Zm_driver + Zm_carga_posterior
+            
+            # 8. Impedancia eléctrica reflejada
+            Ze_mechanical = (self.Bl**2) / Zm_total
+            Ze = Ze_base + Ze_mechanical
+            
+            return Ze
         
-        # Impedancia eléctrica estándar (driver libre o sellada)
-        Ze_mechanical = (self.Bl**2) / (self.Rms * (1 + 1j*Qts_system*(w/(2*np.pi*fs_system) - (2*np.pi*fs_system)/w)))
-        Ze = Ze_base + Ze_mechanical
-        
-        return Ze
+        # ===== OTROS TIPOS DE CAJA =====
+        else:
+            Ze_mechanical = (self.Bl**2) / (self.Rms * (1 + 1j*self.Qts*(w/(2*np.pi*self.Fs) - (2*np.pi*self.Fs)/w)))
+            Ze = Ze_base + Ze_mechanical
+            return Ze
     
 #====================================================================================================================================
     # ===============================
@@ -306,20 +313,37 @@ class Driver:
         if hasattr(self.enclosure, '__class__') and 'BassReflex' in self.enclosure.__class__.__name__:
             return self.spl_bassreflex_total(f, U)
         
-        # SPL estándar para otros tipos de caja
+        # ===== SPL PARA INFINITE BAFFLE Y CAJA SELLADA =====
         Z = self.impedance(f)                                           # Impedancia eléctrica del driver a la frecuencia f
         if np.any(np.abs(Z) == 0):                                      # Evita división por cero
             raise ValueError("La impedancia Z es cero, no se puede calcular SPL.")
-                
+            
         I = U / Z                                                       # Corriente RMS a partir del voltaje RMS U
         if np.any(np.abs(I) == 0):                                      # Evita división por cero
             raise ValueError("La corriente I es cero, no se puede calcular SPL.")
         
-        v = self.velocity(f,U)                                          # Velocidad promedio del pistón a la frecuencia f
+        # ===== CÁLCULO DE VELOCIDAD ESPECÍFICO POR TIPO =====
+        w = 2 * np.pi * f
+        
+        if self.enclosure is None:
+            # INFINITE BAFFLE: Velocidad estándar
+            v = self.velocity(f, U)
+        elif hasattr(self.enclosure, '__class__') and 'Sealed' in self.enclosure.__class__.__name__:
+            # CAJA SELLADA: Velocidad con parámetros del sistema modificados
+            alpha = 1 + self.Vas / (self.enclosure.Vb_m3 * 1000)
+            Cms_sistema = self.Cms / alpha
+            
+            # Impedancia mecánica del sistema (driver + caja)
+            Zm_sistema = self.Rms + 1j*w*self.Mms + 1/(1j*w*Cms_sistema)
+            v = I * (self.Bl / Zm_sistema)  # Velocidad con sistema modificado
+        else:
+            # OTROS TIPOS: Velocidad estándar
+            v = self.velocity(f, U)
+        
         if np.any(np.abs(v) == 0):                                      # Evita división por cero
             raise ValueError("La velocidad v es cero, no se puede calcular SPL.")
 
-        w = 2 * np.pi * f                                               # frecuencia angular
+        # ===== PRESIÓN ACÚSTICA (IGUAL PARA TODOS) =====
         k = w / self.c                                                  # número de onda
         a = np.sqrt(self.Sd / np.pi)                                    # radio equivalente del área Sd
         ka = k * a                                                      # producto del número de onda y el radio
@@ -331,18 +355,15 @@ class Driver:
             mask = ka != 0                                              # Máscara para evitar división por cero
             D[mask] = 2 * j1(ka[mask]) / ka[mask]                       # Calcula D solo donde ka no es cero
         
-        # Nota: j1 es la función Bessel de primer orden, que se usa para calcular la directividad del pistón circular.
         if np.any(np.isnan(D)) or np.any(np.isinf(D)):                  # Verifica si D contiene NaN o infinito
             raise ValueError("El cálculo de la directividad D resultó en un valor no válido (NaN o infinito).")
 
         r = 1.0                                                         # distancia 1 metro
-        p = 1j * w * self.rho0 * v * self.Sd * D / (2 * np.pi * r)      # Presión acústica a 1 metro, considerando radiación hemisférica y directividad
+        p = 1j * w * self.rho0 * v * self.Sd * D / (2 * np.pi * r)      # Presión acústica a 1 metro
         if np.any(np.abs(p) == 0):                                      # Evita división por cero al calcular SPL
             raise ValueError("La presión acústica p es cero, no se puede calcular SPL.")
 
         p_ref = 20e-6                                                   # Presión de referencia en Pa (20 µPa)
-        if p_ref <= 0:                                                  # Verifica que la presión de referencia sea positiva
-            raise ValueError("La presión de referencia p_ref debe ser mayor que cero.")
         SPL = 20 * np.log10(np.abs(p) / p_ref)                          # Nivel de presión sonora en dB a 1 metro
         if np.any(np.isnan(SPL)) or np.any(np.isinf(SPL)):              # Verifica si SPL es NaN o infinito
             raise ValueError("El cálculo de SPL resultó en un valor no válido (NaN o infinito).")
@@ -350,153 +371,342 @@ class Driver:
         return SPL
 
     def spl_bassreflex_total(self, f, U=2.83):
-        # SPL total para bass-reflex = combinación de cono y puerto
-        # La combinación debe dar la forma característica de VituixCAD
-        # Según la imagen turquesa (total):
-        # - 10 Hz: ~60 dB
-        # - 30-50 Hz: valle ~115 dB  
-        # - 100 Hz: ~125 dB
-        # - 1 kHz: ~125 dB (plateau)
-        
-        # Convertir f a array si es escalar
+        """SPL total de bass-reflex con modelo físico correcto"""
         f_was_scalar = np.isscalar(f)
         f = np.atleast_1d(f)
-        spl_total = np.zeros_like(f, dtype=float)
         
-        # Modelo por tramos según la forma turquesa de VituixCAD
-        for i, freq in enumerate(f):
-            if freq <= 15:
-                # Muy bajas frecuencias: ~60 dB
-                spl_total[i] = 60.0
-            elif freq <= 30:
-                # Subida rápida (15-30 Hz): de 60 a 115 dB
-                factor = (freq - 15) / (30 - 15)
-                spl_total[i] = 60.0 + factor * 55.0  # De 60 a 115 dB
-            elif freq <= 60:
-                # Valle/plateau (30-60 Hz): ~115 dB
-                spl_total[i] = 115.0
-            elif freq <= 200:
-                # Subida final (60-200 Hz): de 115 a 125 dB
-                factor = (freq - 60) / (200 - 60)
-                spl_total[i] = 115.0 + factor * 10.0  # De 115 a 125 dB
-            else:
-                # Altas frecuencias: plateau ~125 dB
-                spl_total[i] = 125.0
+        w = 2 * np.pi * f
+        Z = np.array([self.impedance(freq) for freq in f])
+        I = U / Z
         
-        # Retornar escalar si la entrada era escalar
-        return spl_total[0] if f_was_scalar else spl_total
+        # 1. Parámetros del sistema usando el mismo modelo que impedancia
+        Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
+        
+        Vb = self.enclosure.Vb_m3
+        Cab = Vb / (self.rho0 * self.c**2)
+        
+        # Parámetros del puerto
+        try:
+            Sp = getattr(self.enclosure, 'area_ducto', 
+                        getattr(self.enclosure, 'Sp', 0.01))
+            L = getattr(self.enclosure, 'largo_ducto', 
+                       getattr(self.enclosure, 'L', 0.1))
+        except:
+            Sp, L = 0.01, 0.1
+        
+        delta_L = 0.85 * np.sqrt(Sp/np.pi)
+        Leff = L + delta_L
+        
+        # Mismo modelo que impedancia
+        Map = self.rho0 * Leff / Sp
+        Rap = self.rho0 * self.c * 0.01 / Sp
+        
+        # 2. MODELO CORRECTO: Acoplamiento acústico
+        # Impedancias acústicas
+        Zab = 1 / (1j*w*Cab)  # Impedancia de la caja
+        Zap = Rap + 1j*w*Map  # Impedancia del puerto
+        
+        # 3. VELOCIDADES FÍSICAS CORRECTAS
+        # Velocidad del driver con carga posterior
+        Za_paralelo = (Zab * Zap) / (Zab + Zap)
+        Zm_carga_posterior = Za_paralelo * (self.Sd**2)
+        Zm_total_driver = Zm_driver + Zm_carga_posterior
+        v_driver = I * (self.Bl / Zm_total_driver)
+        
+        # Velocidad de volumen del driver
+        Qd = v_driver * self.Sd
+        
+        # 4. VELOCIDAD DEL PUERTO FÍSICA CORRECTA
+        # La presión interna de la caja es proporcional a la velocidad de volumen del driver
+        # p_internal = Qd * Zab
+        # La velocidad volumétrica del puerto: Qp = -p_internal / Zap
+        Qp = -Qd * Zab / Zap
+        
+        # Velocidad superficial del puerto
+        v_port = Qp / Sp
+        
+        # 5. PRESIONES ACÚSTICAS CORRECTAS
+        k = w / self.c
+        r = 1.0
+        
+        # Presión del driver (con directividad)
+        a_driver = np.sqrt(self.Sd / np.pi)
+        ka_driver = k * a_driver
+        D_driver = np.ones_like(ka_driver, dtype=complex)
+        mask = ka_driver != 0
+        D_driver[mask] = 2 * j1(ka_driver[mask]) / ka_driver[mask]
+        
+        p_driver = 1j * w * self.rho0 * v_driver * self.Sd * D_driver / (2 * np.pi * r)
+        
+        # Presión del puerto (con directividad)
+        a_port = np.sqrt(Sp / np.pi)
+        ka_port = k * a_port
+        D_port = np.ones_like(ka_port, dtype=complex)
+        mask = ka_port != 0
+        D_port[mask] = 2 * j1(ka_port[mask]) / ka_port[mask]
+        
+        p_port = 1j * w * self.rho0 * v_port * Sp * D_port / (2 * np.pi * r)
+        
+        # 6. PRESIÓN TOTAL (suma compleja con fase correcta)
+        # El puerto y el driver pueden estar en fase o fuera de fase dependiendo de la frecuencia
+        p_total = p_driver + p_port
+        
+        # 7. SPL total
+        p_ref = 20e-6
+        SPL_total = 20 * np.log10(np.abs(p_total) / p_ref)
+        
+        return SPL_total[0] if f_was_scalar else SPL_total
 
     def spl_bassreflex_cone(self, f, U=2.83):
-        # SPL del cono en bass-reflex (curva azul en VituixCAD)
-        # Según VituixCAD la curva azul (cono):
-        # - 10 Hz: ~70 dB  
-        # - 30 Hz: ~80 dB
-        # - 100 Hz: ~97 dB
-        # - 1 kHz: ~97 dB (plana)
-        
-        # Convertir f a array si es escalar
+        """SPL solo del cono en bass-reflex"""
         f_was_scalar = np.isscalar(f)
         f = np.atleast_1d(f)
-        spl_cone = np.zeros_like(f, dtype=float)
         
-        # Modelo por tramos según la forma de VituixCAD
-        for i, freq in enumerate(f):
-            if freq <= 20:
-                # Muy bajas frecuencias: ~70 dB
-                spl_cone[i] = 70.0
-            elif freq <= 50:
-                # Subida gradual de 70 a 80 dB (20-50 Hz)
-                factor = (freq - 20) / (50 - 20)
-                spl_cone[i] = 70.0 + factor * 10.0  # De 70 a 80 dB
-            elif freq <= 200:
-                # Subida más rápida de 80 a 97 dB (50-200 Hz)
-                factor = (freq - 50) / (200 - 50)
-                spl_cone[i] = 80.0 + factor * 17.0  # De 80 a 97 dB
-            else:
-                # Altas frecuencias: plano en ~97 dB
-                spl_cone[i] = 97.0
+        w = 2 * np.pi * f
+        Z = np.array([self.impedance(freq) for freq in f])
+        I = U / Z
         
-        # Retornar escalar si la entrada era escalar
-        return spl_cone[0] if f_was_scalar else spl_cone
+        # Mismos cálculos que en spl_bassreflex_total
+        Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
+        
+        Vb = self.enclosure.Vb_m3
+        Cab = Vb / (self.rho0 * self.c**2)
+        
+        try:
+            Sp = getattr(self.enclosure, 'area_ducto', 
+                        getattr(self.enclosure, 'Sp', 0.01))
+            L = getattr(self.enclosure, 'largo_ducto', 
+                       getattr(self.enclosure, 'L', 0.1))
+        except:
+            Sp, L = 0.01, 0.1
+        
+        delta_L = 0.85 * np.sqrt(Sp/np.pi)
+        Leff = L + delta_L
+        Map = self.rho0 * Leff / Sp
+        Rap = self.rho0 * self.c * 0.01 / Sp
+        
+        # Acoplamiento
+        Zab = 1 / (1j*w*Cab)
+        Zap = Rap + 1j*w*Map
+        Za_paralelo = (Zab * Zap) / (Zab + Zap)
+        Zm_carga_posterior = Za_paralelo * (self.Sd**2)
+        
+        # Velocidad del driver
+        Zm_total_driver = Zm_driver + Zm_carga_posterior
+        v_driver = I * (self.Bl / Zm_total_driver)
+        
+        # SPL solo del cono
+        k = w / self.c
+        a_driver = np.sqrt(self.Sd / np.pi)
+        ka_driver = k * a_driver
+        
+        D_driver = np.ones_like(ka_driver, dtype=complex)
+        mask = ka_driver != 0
+        D_driver[mask] = 2 * j1(ka_driver[mask]) / ka_driver[mask]
+        
+        r = 1.0
+        p_driver = 1j * w * self.rho0 * v_driver * self.Sd * D_driver / (2 * np.pi * r)
+        
+        p_ref = 20e-6
+        SPL_cone = 20 * np.log10(np.abs(p_driver) / p_ref)
+        
+        return SPL_cone[0] if f_was_scalar else SPL_cone
 
     def spl_bassreflex_port(self, f, U=2.83):
-        # SPL del puerto en bass-reflex (curva roja en VituixCAD)
-        # Según VituixCAD la curva roja (puerto):
-        # - 10 Hz: ~70 dB
-        # - 30-50 Hz: pico ~88 dB
-        # - 100 Hz: ~80 dB
-        # - 1 kHz: ~60 dB (bajando)
-        
-        # Convertir f a array si es escalar
+        """SPL solo del puerto en bass-reflex"""
         f_was_scalar = np.isscalar(f)
         f = np.atleast_1d(f)
-        spl_port = np.zeros_like(f, dtype=float)
         
-        # Modelo por tramos según la forma de VituixCAD
-        for i, freq in enumerate(f):
-            if freq <= 20:
-                # Muy bajas frecuencias: ~70 dB
-                spl_port[i] = 70.0
-            elif freq <= 40:
-                # Subida al pico (20-40 Hz): de 70 a 88 dB
-                factor = (freq - 20) / (40 - 20)
-                spl_port[i] = 70.0 + factor * 18.0  # De 70 a 88 dB
-            elif freq <= 60:
-                # En el pico (40-60 Hz): ~88 dB
-                spl_port[i] = 88.0
-            elif freq <= 150:
-                # Bajada del pico (60-150 Hz): de 88 a 75 dB
-                factor = (freq - 60) / (150 - 60)
-                spl_port[i] = 88.0 - factor * 13.0  # De 88 a 75 dB
-            elif freq <= 1000:
-                # Bajada continua (150-1000 Hz): de 75 a 60 dB
-                factor = (freq - 150) / (1000 - 150)
-                spl_port[i] = 75.0 - factor * 15.0  # De 75 a 60 dB
-            else:
-                # Altas frecuencias: ~60 dB
-                spl_port[i] = 60.0
+        w = 2 * np.pi * f
+        Z = np.array([self.impedance(freq) for freq in f])
+        I = U / Z
         
-        # Retornar escalar si la entrada era escalar
-        return spl_port[0] if f_was_scalar else spl_port
-
-    def spl_phase(self, f, U=2.83):
-
-        Z = self.impedance(f)                                           # Impedancia eléctrica del driver a la frecuencia f
-        if np.abs(Z) == 0:                                              # Evita división por cero
-            raise ValueError("La impedancia Z es cero, no se puede calcular SPL.")
-                
-        I = U / Z                                                       # Corriente RMS a partir del voltaje RMS U
-        if np.abs(I) == 0:                                              # Evita división por cero
-            raise ValueError("La corriente I es cero, no se puede calcular SPL.")
+        # Mismos cálculos que en spl_bassreflex_total
+        Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
         
-        v = self.velocity(f, U)                                         # Velocidad promedio del pistón a la frecuencia f
-        if np.abs(v) == 0:                                              # Evita división por cero
-            raise ValueError("La velocidad v es cero, no se puede calcular SPL.")
-
-        w = 2 * np.pi * f                                               # frecuencia angular
-        k = w / self.c                                                  # número de onda
-        a = np.sqrt(self.Sd / np.pi)                                    # radio equivalente del área Sd
-        ka = k * a                                                      # producto del número de onda y el radio
-
-        if np.isscalar(f):                                              # Si f es un escalar, calcula D directamente
-            D = 1.0 if ka == 0 else 2 * j1(ka) / ka                     # Evita división por cero
-        else:
-            D = np.ones_like(ka)                                        # Inicializa D como un array de unos
-            D[ka != 0] = 2 * j1(ka[ka != 0]) / ka[ka != 0]              # Calcula D solo donde ka no es cero
-
-        r = 1.0                                                         # distancia 1 metro
-        p = 1j * w * self.rho0 * v * self.Sd * D / (2 * np.pi * r)      # Presión acústica a 1 metro, considerando radiación hemisférica y directividad
+        Vb = self.enclosure.Vb_m3
+        Cab = Vb / (self.rho0 * self.c**2)
         
-        phase_rad = np.angle(p)
+        try:
+            Sp = getattr(self.enclosure, 'area_ducto', 
+                        getattr(self.enclosure, 'Sp', 0.01))
+            L = getattr(self.enclosure, 'largo_ducto', 
+                       getattr(self.enclosure, 'L', 0.1))
+        except:
+            Sp, L = 0.01, 0.1
+        
+        delta_L = 0.85 * np.sqrt(Sp/np.pi)
+        Leff = L + delta_L
+        Map = self.rho0 * Leff / Sp
+        Rap = self.rho0 * self.c * 0.01 / Sp
+        
+        # Acoplamiento
+        Zab = 1 / (1j*w*Cab)
+        Zap = Rap + 1j*w*Map
+        Za_paralelo = (Zab * Zap) / (Zab + Zap)
+        Zm_carga_posterior = Za_paralelo * (self.Sd**2)
+        
+        # Velocidad del driver
+        Zm_total_driver = Zm_driver + Zm_carga_posterior
+        v_driver = I * (self.Bl / Zm_total_driver)
+        
+        # Velocidad del puerto (físicamente correcta)
+        Qd = v_driver * self.Sd  # Velocidad de volumen del driver
+        Qp = -Qd * Zab / Zap     # Velocidad de volumen del puerto
+        v_port = Qp / Sp         # Velocidad superficial del puerto
+        
+        # SPL solo del puerto
+        k = w / self.c
+        a_port = np.sqrt(Sp / np.pi)
+        ka_port = k * a_port
+        
+        D_port = np.ones_like(ka_port, dtype=complex)
+        mask = ka_port != 0
+        D_port[mask] = 2 * j1(ka_port[mask]) / ka_port[mask]
+        
+        r = 1.0
+        p_port = 1j * w * self.rho0 * v_port * Sp * D_port / (2 * np.pi * r)
+        
+        p_ref = 20e-6
+        SPL_port = 20 * np.log10(np.abs(p_port) / p_ref)
+        
+        return SPL_port[0] if f_was_scalar else SPL_port
 
-        if np.isscalar(f):
-            # Entrada escalar → no usar unwrap
+    # ===== MÉTODOS DE FASE BASS-REFLEX =====
+    
+    def spl_bassreflex_phase(self, f, U=2.83):
+        """Calcula la fase del SPL total para bass-reflex (cono + puerto)"""
+        if np.any(np.asarray(f) <= 0):
+            raise ValueError("La frecuencia debe ser mayor que cero.")
+        
+        # Obtener SPL complejo del cono y puerto
+        spl_cone_complex = self.spl_bassreflex_cone_complex(f, U)
+        spl_port_complex = self.spl_bassreflex_port_complex(f, U)
+        
+        # SPL total complejo (suma de presiones)
+        spl_total_complex = spl_cone_complex + spl_port_complex
+        
+        # Calcular fase y aplicar unwrap
+        phase_rad = np.angle(spl_total_complex)
+        
+        if np.isscalar(phase_rad):
             phase_deg = np.degrees(phase_rad)
         else:
-            # Entrada vectorial → usar unwrap
             phase_unwrapped = np.unwrap(phase_rad)
             phase_deg = np.degrees(phase_unwrapped)
+        
+        return phase_deg
 
+    def spl_bassreflex_cone_complex(self, f, U=2.83):
+        """Devuelve el SPL complejo del cono para bass-reflex"""
+        f_was_scalar = np.isscalar(f)
+        f = np.atleast_1d(f)
+        
+        # Obtener magnitud del SPL del cono
+        spl_cone_mag = self.spl_bassreflex_cone(f, U)
+        
+        # Crear fase simplificada para el cono
+        w = 2 * np.pi * f
+        fs_approx = self.Fs * 0.8  # Frecuencia de resonancia aproximada en bass-reflex
+        phase_rad = np.arctan2(w / (2 * np.pi * fs_approx), 1)
+        
+        # Convertir SPL de dB a presión compleja
+        p_ref = 20e-6
+        p_mag = p_ref * 10**(spl_cone_mag / 20)
+        p_complex = p_mag * np.exp(1j * phase_rad)
+        
+        return p_complex[0] if f_was_scalar else p_complex
+
+    def spl_bassreflex_port_complex(self, f, U=2.83):
+        """Devuelve el SPL complejo del puerto para bass-reflex"""
+        f_was_scalar = np.isscalar(f)
+        f = np.atleast_1d(f)
+        
+        # Obtener magnitud del SPL del puerto
+        spl_port_mag = self.spl_bassreflex_port(f, U)
+        
+        # Crear fase simplificada para el puerto
+        w = 2 * np.pi * f
+        fb = 50  # Frecuencia de sintonía del puerto (aproximada)
+        
+        # Fase del puerto: adelantada respecto al cono
+        phase_rad = np.arctan2(w / (2 * np.pi * fb), 1) - np.pi/2
+        
+        # Convertir SPL de dB a presión compleja
+        p_ref = 20e-6
+        p_mag = p_ref * 10**(spl_port_mag / 20)
+        p_complex = p_mag * np.exp(1j * phase_rad)
+        
+        return p_complex[0] if f_was_scalar else p_complex
+
+    def spl_phase(self, f, U=2.83):
+        """
+        Calcula la fase del SPL.
+        
+        La fase del SPL está relacionada con la fase de la velocidad del diafragma
+        y la directividad del driver.
+        
+        Args:
+            f: Frecuencia en Hz (escalar o array)
+            U: Voltaje RMS aplicado en V (por defecto 2.83V)
+            
+        Returns:
+            Fase del SPL en grados (con unwrap)
+        """
+        if np.any(np.asarray(f) <= 0):
+            raise ValueError("La frecuencia debe ser mayor que cero para calcular la fase del SPL.")
+
+        # Para bass-reflex, usar método específico
+        if hasattr(self.enclosure, '__class__') and 'BassReflex' in self.enclosure.__class__.__name__:
+            return self.spl_bassreflex_phase(f, U)
+        
+        # ===== CÁLCULO DE FASE PARA INFINITE BAFFLE Y CAJA SELLADA =====
+        w = 2 * np.pi * f
+        
+        # 1. Obtener la corriente compleja
+        Z = self.impedance(f)
+        I = U / Z
+        
+        # 2. Calcular velocidad compleja (específica por tipo)
+        if self.enclosure is None:
+            # INFINITE BAFFLE
+            v = self.velocity(f, U)
+        elif hasattr(self.enclosure, '__class__') and 'Sealed' in self.enclosure.__class__.__name__:
+            # CAJA SELLADA: usar misma lógica que en spl_total()
+            alpha = 1 + self.Vas / (self.enclosure.Vb_m3 * 1000)
+            Cms_sistema = self.Cms / alpha
+            Zm_sistema = self.Rms + 1j*w*self.Mms + 1/(1j*w*Cms_sistema)
+            v = I * (self.Bl / Zm_sistema)
+        else:
+            # OTROS TIPOS
+            v = self.velocity(f, U)
+        
+        # 3. Calcular directividad compleja
+        k = w / self.c
+        a = np.sqrt(self.Sd / np.pi)
+        ka = k * a
+        
+        if np.isscalar(ka):
+            D = 1.0 if ka == 0 else 2 * j1(ka) / ka
+        else:
+            D = np.ones_like(ka, dtype=complex)
+            mask = ka != 0
+            D[mask] = 2 * j1(ka[mask]) / ka[mask]
+        
+        # 4. Presión acústica compleja
+        r = 1.0
+        p_complex = 1j * w * self.rho0 * v * self.Sd * D / (2 * np.pi * r)
+        
+        # 5. Calcular fase y aplicar unwrap
+        phase_rad = np.angle(p_complex)
+        
+        # Aplicar unwrap para evitar saltos de fase
+        if np.isscalar(phase_rad):
+            phase_deg = np.degrees(phase_rad)
+        else:
+            phase_unwrapped = np.unwrap(phase_rad)
+            phase_deg = np.degrees(phase_unwrapped)
+        
         return phase_deg
 
 #====================================================================================================================================
@@ -533,15 +743,20 @@ class Driver:
         # --- Impedancia mecánica total (driver + carga acústica) ---
         Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
         
-        Za_rear = 0
-        if self.enclosure is not None and hasattr(self.enclosure, "acoustic_load"):
-            Za_rear = self.enclosure.acoustic_load(f, self.Sd)
-        
-        Za_front = 0
-        if self.enclosure is not None and hasattr(self.enclosure, "radiation_impedance"):
-            Za_front = self.enclosure.radiation_impedance(f, self.Sd)
+        # Para infinite baffle: solo la impedancia mecánica del driver
+        if self.enclosure is None:
+            Zm_total = Zm_driver                            # Infinite baffle = solo driver mecánico
+        else:
+            # Driver con enclosure
+            Za_rear = 0
+            if hasattr(self.enclosure, "acoustic_load"):
+                Za_rear = self.enclosure.acoustic_load(f, self.Sd)
+            
+            Za_front = 0
+            if hasattr(self.enclosure, "radiation_impedance"):
+                Za_front = self.enclosure.radiation_impedance(f, self.Sd)
 
-        Zm_total = Zm_driver + Za_rear + Za_front
+            Zm_total = Zm_driver + Za_rear + Za_front
 
         v = I * (self.Bl / Zm_total)                        # Velocidad real del diafragma [m/s]
 
