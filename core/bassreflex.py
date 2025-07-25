@@ -2,16 +2,31 @@ from core.enclosure import Enclosure                                      # Impo
 import numpy as np                                                      # Importa numpy para cálculos matemáticos
 
 class BassReflexBox(Enclosure):
-    def __init__(self, vb_litros, area_port, length_port):
-        super().__init__(vb_litros)                                     # Inicializa la clase padre con el volumen
-        self.area_port = area_port                                      # Área del puerto en m²
-        self.length_port = length_port                                  # Longitud del puerto en m
+    def __init__(self, Vb_m3, rho0, c, zrad, area_port=None, length_port=None):
+        self.Vb_m3 = Vb_m3
+        self.rho0 = rho0
+        self.c = c
+        self.zrad = zrad
         
-        a_port = np.sqrt(self.area_port / np.pi)                       # Radio efectivo del puerto
-        delta = 0.85 * a_port                                          # Corrección de extremo del puerto
-        self.Leff = self.length_port + 2 * delta                       # Longitud efectiva del puerto
+        # Ajustar estos valores para obtener resonancia a ~35Hz
+        if area_port is None:
+            self.area_port = 0.005  # 50 cm² en lugar de 100 cm²
+        else:
+            self.area_port = area_port
+            
+        if length_port is None:
+            self.length_port = 0.28  # 28 cm en lugar de 10 cm
+        else:
+            self.length_port = length_port
         
-        self.fp = (self.c / (2 * np.pi)) * np.sqrt(self.area_port / (self.Vb_m3 * self.Leff)) # Frecuencia de resonancia Helmholtz del puerto
+        # Calcular la longitud efectiva con corrección de terminación
+        delta_L = 0.85 * np.sqrt(self.area_port/np.pi)
+        self.Leff = self.length_port + delta_L
+        
+        # Calcular la frecuencia de resonancia del puerto
+        Cab = self.Vb_m3 / (self.rho0 * self.c**2)
+        Map = self.rho0 * self.Leff / self.area_port
+        self.fp = 1 / (2 * np.pi * np.sqrt(Map * Cab))
 
     def acoustic_load(self, f, Sd):
         # Impedancia mecánica trasera del bass-reflex.

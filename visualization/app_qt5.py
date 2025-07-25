@@ -235,8 +235,26 @@ class AppQt(QMainWindow):
                 largo_ducto = float(self.length_port_entry.text())
             except ValueError:
                 largo_ducto = 0.10
+        
+            # CORRECCIÓN: Importar módulos necesarios al principio del archivo
+            from core.zrad import RadiationImpedance
             from core.bassreflex import BassReflexBox
-            enclosure = BassReflexBox(vb_litros, area_ducto, largo_ducto)
+
+            # Crear objeto de impedancia de radiación
+            zrad = RadiationImpedance()
+
+            # Convertir volumen de litros a metros cúbicos si es necesario
+            vb_m3 = vb_litros / 1000 if vb_litros > 1 else vb_litros  # Asume litros si es > 1
+
+            # Crear la caja bass-reflex con todos los parámetros requeridos
+            enclosure = BassReflexBox(
+                Vb_m3=vb_m3,               # Volumen en metros cúbicos
+                rho0=1.21,                 # Densidad del aire kg/m³
+                c=343,                     # Velocidad del sonido m/s
+                zrad=zrad,                 # Objeto de impedancia de radiación
+                area_port=area_ducto,      # Área del puerto en m²
+                length_port=largo_ducto    # Longitud del puerto en m
+            )
         elif enclosure_type == "Caja Sellada":
             from core.sealed import SealedBox
             enclosure = SealedBox(vb_litros)
@@ -564,13 +582,17 @@ no hay duplicación de parámetros.""")
 
         # --- Pestañas individuales ---
         for i, (tab, layout) in enumerate(self.single_plot_tabs):
+            # Verificar que el índice esté en rango
+            if not hasattr(self, 'fig') or self.fig is None or i >= len(self.fig.axes):
+                continue
+                
             for j in reversed(range(layout.count())):
                 widget = layout.itemAt(j).widget()
                 if widget is not None:
                     layout.removeWidget(widget)
                     widget.setParent(None)
             fig_single, ax_single = plt.subplots(figsize=(6, 4))
-            orig_ax = self.fig.axes[i]  # Usa el índice directo
+            orig_ax = self.fig.axes[i]  # Ahora es seguro
 
             # 1. Copia el eje principal
             ax_single.set_xscale(orig_ax.get_xscale())

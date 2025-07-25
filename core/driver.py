@@ -231,7 +231,7 @@ class Driver:
             Ze = Ze_base + Ze_mechanical
             return Ze
         
-        # ===== BASS-REFLEX - MODELO FÍSICO CORRECTO =====
+        # ===== BASS-REFLEX =====
         elif hasattr(self.enclosure, '__class__') and 'BassReflex' in self.enclosure.__class__.__name__:
             # 1. Impedancia mecánica del driver
             Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
@@ -292,6 +292,7 @@ class Driver:
             Zm_total = Zm_driver + Zm_carga_posterior
             
             # 8. Impedancia eléctrica reflejada
+            Ze_base = self.Re + self.Rg + (1j * w * self.Le if not self.Reh else 1 / (1j * w * self.Le + 1 / self.Reh))
             Ze_mechanical = (self.Bl**2) / Zm_total
             Ze = Ze_base + Ze_mechanical
             
@@ -371,208 +372,177 @@ class Driver:
         return SPL
 
     def spl_bassreflex_total(self, f, U=2.83):
-        """SPL total de bass-reflex con modelo físico correcto"""
+        """SPL bass-reflex total según teoría física correcta"""
         f_was_scalar = np.isscalar(f)
         f = np.atleast_1d(f)
         
+        # 1. PARÁMETROS DEL SISTEMA
         w = 2 * np.pi * f
-        Z = np.array([self.impedance(freq) for freq in f])
-        I = U / Z
-        
-        # 1. Parámetros del sistema usando el mismo modelo que impedancia
-        Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
-        
         Vb = self.enclosure.Vb_m3
         Cab = Vb / (self.rho0 * self.c**2)
         
-        # Parámetros del puerto
-        try:
-            Sp = getattr(self.enclosure, 'area_ducto', 
-                        getattr(self.enclosure, 'Sp', 0.01))
-            L = getattr(self.enclosure, 'largo_ducto', 
-                       getattr(self.enclosure, 'L', 0.1))
-        except:
-            Sp, L = 0.01, 0.1
-        
+        # 2. PARÁMETROS DEL PUERTO
+        Sp = self.enclosure.area_port
+        L = self.enclosure.length_port
         delta_L = 0.85 * np.sqrt(Sp/np.pi)
         Leff = L + delta_L
-        
-        # Mismo modelo que impedancia
         Map = self.rho0 * Leff / Sp
-        Rap = self.rho0 * self.c * 0.01 / Sp
         
-        # 2. MODELO CORRECTO: Acoplamiento acústico
-        # Impedancias acústicas
-        Zab = 1 / (1j*w*Cab)  # Impedancia de la caja
-        Zap = Rap + 1j*w*Map  # Impedancia del puerto
+        # 3. IMPEDANCIAS ACÚSTICAS
+        Zab = 1 / (1j*w*Cab)                          # Impedancia de la caja
+        Zap = self.rho0 * self.c * 0.02 / Sp + 1j*w*Map  # Impedancia del puerto
+        Za_paralelo = (Zab * Zap) / (Zab + Zap)       # Impedancia paralela
         
-        # 3. VELOCIDADES FÍSICAS CORRECTAS
-        # Velocidad del driver con carga posterior
-        Za_paralelo = (Zab * Zap) / (Zab + Zap)
-        Zm_carga_posterior = Za_paralelo * (self.Sd**2)
-        Zm_total_driver = Zm_driver + Zm_carga_posterior
-        v_driver = I * (self.Bl / Zm_total_driver)
+        # 4. IMPEDANCIAS MECÁNICAS
+        Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
+        Zm_carga = Za_paralelo * (self.Sd**2)         # Transformación acústica→mecánica
+        Zm_total = Zm_driver + Zm_carga               # Impedancia mecánica total
         
-        # Velocidad de volumen del driver
-        Qd = v_driver * self.Sd
+        # 5. CORRIENTE Y VELOCIDADES
+        Z = np.array([self.impedance(freq) for freq in f])
+        I = U / Z
+        v_driver = I * (self.Bl / Zm_total)           # Velocidad del cono
         
-        # 4. VELOCIDAD DEL PUERTO FÍSICA CORRECTA
-        # La presión interna de la caja es proporcional a la velocidad de volumen del driver
-        # p_internal = Qd * Zab
-        # La velocidad volumétrica del puerto: Qp = -p_internal / Zap
-        Qp = -Qd * Zab / Zap
+        # 6. CAUDAL ACÚSTICO (CONSERVACIÓN DE MASA)
+        Qd = v_driver * self.Sd                       # Caudal del diafragma
+        Qp = -Qd * Zab / (Zab + Zap)                  # Caudal del puerto (negativo)
+        v_port = Qp / Sp                              # Velocidad del puerto
         
-        # Velocidad superficial del puerto
-        v_port = Qp / Sp
-        
-        # 5. PRESIONES ACÚSTICAS CORRECTAS
+        # 7. RADIACIÓN ACÚSTICA
         k = w / self.c
-        r = 1.0
+        r = 1.0  # Distancia de 1m
         
-        # Presión del driver (con directividad)
+        # 7.1 Radiación del cono
         a_driver = np.sqrt(self.Sd / np.pi)
         ka_driver = k * a_driver
-        D_driver = np.ones_like(ka_driver, dtype=complex)
+        D_driver = np.ones_like(ka_driver)
         mask = ka_driver != 0
         D_driver[mask] = 2 * j1(ka_driver[mask]) / ka_driver[mask]
         
         p_driver = 1j * w * self.rho0 * v_driver * self.Sd * D_driver / (2 * np.pi * r)
         
-        # Presión del puerto (con directividad)
+        # 7.2 Radiación del puerto
         a_port = np.sqrt(Sp / np.pi)
         ka_port = k * a_port
-        D_port = np.ones_like(ka_port, dtype=complex)
+        D_port = np.ones_like(ka_port)
         mask = ka_port != 0
         D_port[mask] = 2 * j1(ka_port[mask]) / ka_port[mask]
         
         p_port = 1j * w * self.rho0 * v_port * Sp * D_port / (2 * np.pi * r)
         
-        # 6. PRESIÓN TOTAL (suma compleja con fase correcta)
-        # El puerto y el driver pueden estar en fase o fuera de fase dependiendo de la frecuencia
+        # 8. SUMA DE PRESIONES (considerando fase)
         p_total = p_driver + p_port
         
-        # 7. SPL total
+        # 9. CÁLCULO DE SPL
         p_ref = 20e-6
         SPL_total = 20 * np.log10(np.abs(p_total) / p_ref)
         
         return SPL_total[0] if f_was_scalar else SPL_total
 
     def spl_bassreflex_cone(self, f, U=2.83):
-        """SPL solo del cono en bass-reflex"""
+        """SPL solo del cono"""
         f_was_scalar = np.isscalar(f)
         f = np.atleast_1d(f)
         
+        # 1. PARÁMETROS DEL SISTEMA
         w = 2 * np.pi * f
-        Z = np.array([self.impedance(freq) for freq in f])
-        I = U / Z
-        
-        # Mismos cálculos que en spl_bassreflex_total
-        Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
-        
         Vb = self.enclosure.Vb_m3
         Cab = Vb / (self.rho0 * self.c**2)
         
-        try:
-            Sp = getattr(self.enclosure, 'area_ducto', 
-                        getattr(self.enclosure, 'Sp', 0.01))
-            L = getattr(self.enclosure, 'largo_ducto', 
-                       getattr(self.enclosure, 'L', 0.1))
-        except:
-            Sp, L = 0.01, 0.1
-        
+        # 2. PARÁMETROS DEL PUERTO
+        Sp = self.enclosure.area_port
+        L = self.enclosure.length_port
         delta_L = 0.85 * np.sqrt(Sp/np.pi)
         Leff = L + delta_L
         Map = self.rho0 * Leff / Sp
-        Rap = self.rho0 * self.c * 0.01 / Sp
         
-        # Acoplamiento
-        Zab = 1 / (1j*w*Cab)
-        Zap = Rap + 1j*w*Map
-        Za_paralelo = (Zab * Zap) / (Zab + Zap)
-        Zm_carga_posterior = Za_paralelo * (self.Sd**2)
+        # 3. IMPEDANCIAS ACÚSTICAS
+        Zab = 1 / (1j*w*Cab)                          # Impedancia de la caja
+        Zap = self.rho0 * self.c * 0.02 / Sp + 1j*w*Map  # Impedancia del puerto
+        Za_paralelo = (Zab * Zap) / (Zab + Zap)       # Impedancia paralela
         
-        # Velocidad del driver
-        Zm_total_driver = Zm_driver + Zm_carga_posterior
-        v_driver = I * (self.Bl / Zm_total_driver)
+        # 4. IMPEDANCIAS MECÁNICAS
+        Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
+        Zm_carga = Za_paralelo * (self.Sd**2)         # Transformación acústica→mecánica
+        Zm_total = Zm_driver + Zm_carga               # Impedancia mecánica total
         
-        # SPL solo del cono
+        # 5. CORRIENTE Y VELOCIDADES
+        Z = np.array([self.impedance(freq) for freq in f])
+        I = U / Z
+        v_driver = I * (self.Bl / Zm_total)           # Velocidad del cono
+        
+        # 6. RADIACIÓN ACÚSTICA DEL CONO
         k = w / self.c
+        r = 1.0  # Distancia de 1m
+        
         a_driver = np.sqrt(self.Sd / np.pi)
         ka_driver = k * a_driver
-        
-        D_driver = np.ones_like(ka_driver, dtype=complex)
+        D_driver = np.ones_like(ka_driver)
         mask = ka_driver != 0
         D_driver[mask] = 2 * j1(ka_driver[mask]) / ka_driver[mask]
         
-        r = 1.0
         p_driver = 1j * w * self.rho0 * v_driver * self.Sd * D_driver / (2 * np.pi * r)
         
+        # 7. CÁLCULO DE SPL DEL CONO
         p_ref = 20e-6
         SPL_cone = 20 * np.log10(np.abs(p_driver) / p_ref)
         
         return SPL_cone[0] if f_was_scalar else SPL_cone
 
     def spl_bassreflex_port(self, f, U=2.83):
-        """SPL solo del puerto en bass-reflex"""
+        """SPL solo del puerto"""
         f_was_scalar = np.isscalar(f)
         f = np.atleast_1d(f)
         
+        # 1. PARÁMETROS DEL SISTEMA
         w = 2 * np.pi * f
-        Z = np.array([self.impedance(freq) for freq in f])
-        I = U / Z
-        
-        # Mismos cálculos que en spl_bassreflex_total
-        Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
-        
         Vb = self.enclosure.Vb_m3
         Cab = Vb / (self.rho0 * self.c**2)
         
-        try:
-            Sp = getattr(self.enclosure, 'area_ducto', 
-                        getattr(self.enclosure, 'Sp', 0.01))
-            L = getattr(self.enclosure, 'largo_ducto', 
-                       getattr(self.enclosure, 'L', 0.1))
-        except:
-            Sp, L = 0.01, 0.1
-        
+        # 2. PARÁMETROS DEL PUERTO
+        Sp = self.enclosure.area_port
+        L = self.enclosure.length_port
         delta_L = 0.85 * np.sqrt(Sp/np.pi)
         Leff = L + delta_L
         Map = self.rho0 * Leff / Sp
-        Rap = self.rho0 * self.c * 0.01 / Sp
         
-        # Acoplamiento
-        Zab = 1 / (1j*w*Cab)
-        Zap = Rap + 1j*w*Map
-        Za_paralelo = (Zab * Zap) / (Zab + Zap)
-        Zm_carga_posterior = Za_paralelo * (self.Sd**2)
+        # 3. IMPEDANCIAS ACÚSTICAS
+        Zab = 1 / (1j*w*Cab)                          # Impedancia de la caja
+        Zap = self.rho0 * self.c * 0.02 / Sp + 1j*w*Map  # Impedancia del puerto
+        Za_paralelo = (Zab * Zap) / (Zab + Zap)       # Impedancia paralela
         
-        # Velocidad del driver
-        Zm_total_driver = Zm_driver + Zm_carga_posterior
-        v_driver = I * (self.Bl / Zm_total_driver)
+        # 4. IMPEDANCIAS MECÁNICAS
+        Zm_driver = self.Rms + 1j*w*self.Mms + 1/(1j*w*self.Cms)
+        Zm_carga = Za_paralelo * (self.Sd**2)         # Transformación acústica→mecánica
+        Zm_total = Zm_driver + Zm_carga               # Impedancia mecánica total
         
-        # Velocidad del puerto (físicamente correcta)
-        Qd = v_driver * self.Sd  # Velocidad de volumen del driver
-        Qp = -Qd * Zab / Zap     # Velocidad de volumen del puerto
-        v_port = Qp / Sp         # Velocidad superficial del puerto
+        # 5. CORRIENTE Y VELOCIDADES
+        Z = np.array([self.impedance(freq) for freq in f])
+        I = U / Z
+        v_driver = I * (self.Bl / Zm_total)           # Velocidad del cono
         
-        # SPL solo del puerto
+        # 6. CAUDAL ACÚSTICO (CONSERVACIÓN DE MASA)
+        Qd = v_driver * self.Sd                       # Caudal del diafragma
+        Qp = -Qd * Zab / (Zab + Zap)                  # Caudal del puerto (negativo)
+        v_port = Qp / Sp                              # Velocidad del puerto
+        
+        # 7. RADIACIÓN ACÚSTICA DEL PUERTO
         k = w / self.c
+        r = 1.0  # Distancia de 1m
+        
         a_port = np.sqrt(Sp / np.pi)
         ka_port = k * a_port
-        
-        D_port = np.ones_like(ka_port, dtype=complex)
+        D_port = np.ones_like(ka_port)
         mask = ka_port != 0
         D_port[mask] = 2 * j1(ka_port[mask]) / ka_port[mask]
         
-        r = 1.0
         p_port = 1j * w * self.rho0 * v_port * Sp * D_port / (2 * np.pi * r)
         
+        # 8. CÁLCULO DE SPL DEL PUERTO
         p_ref = 20e-6
         SPL_port = 20 * np.log10(np.abs(p_port) / p_ref)
         
         return SPL_port[0] if f_was_scalar else SPL_port
-
-    # ===== MÉTODOS DE FASE BASS-REFLEX =====
     
     def spl_bassreflex_phase(self, f, U=2.83):
         """Calcula la fase del SPL total para bass-reflex (cono + puerto)"""
@@ -598,45 +568,58 @@ class Driver:
         return phase_deg
 
     def spl_bassreflex_cone_complex(self, f, U=2.83):
-        """Devuelve el SPL complejo del cono para bass-reflex"""
+        """SPL complejo del cono con frecuencia de resonancia real"""
         f_was_scalar = np.isscalar(f)
         f = np.atleast_1d(f)
-        
-        # Obtener magnitud del SPL del cono
+    
         spl_cone_mag = self.spl_bassreflex_cone(f, U)
-        
-        # Crear fase simplificada para el cono
+    
+        # CALCULAR FRECUENCIA DE RESONANCIA REAL DEL SISTEMA
+        Vb = self.enclosure.Vb_m3
+        alpha = 1 + self.Vas / (Vb * 1000)
+        fs_system = self.Fs * np.sqrt(alpha)  # Frecuencia real del sistema
+    
         w = 2 * np.pi * f
-        fs_approx = self.Fs * 0.8  # Frecuencia de resonancia aproximada en bass-reflex
-        phase_rad = np.arctan2(w / (2 * np.pi * fs_approx), 1)
-        
-        # Convertir SPL de dB a presión compleja
+        phase_rad = np.arctan2(w / (2 * np.pi * fs_system), 1)
+    
         p_ref = 20e-6
         p_mag = p_ref * 10**(spl_cone_mag / 20)
         p_complex = p_mag * np.exp(1j * phase_rad)
-        
+    
         return p_complex[0] if f_was_scalar else p_complex
 
     def spl_bassreflex_port_complex(self, f, U=2.83):
-        """Devuelve el SPL complejo del puerto para bass-reflex"""
+        """SPL complejo del puerto con frecuencia de resonancia real"""
         f_was_scalar = np.isscalar(f)
         f = np.atleast_1d(f)
-        
-        # Obtener magnitud del SPL del puerto
+    
         spl_port_mag = self.spl_bassreflex_port(f, U)
-        
-        # Crear fase simplificada para el puerto
+    
+        # CALCULAR FRECUENCIA DE RESONANCIA REAL DEL PUERTO
+        try:
+            Sp = getattr(self.enclosure, 'area_ducto', 
+                        getattr(self.enclosure, 'Sp', 0.01))
+            L = getattr(self.enclosure, 'largo_ducto', 
+                       getattr(self.enclosure, 'L', 0.1))
+        except:
+            Sp, L = 0.01, 0.1
+    
+        Vb = self.enclosure.Vb_m3
+        Cab = Vb / (self.rho0 * self.c**2)
+        delta_L = 0.85 * np.sqrt(Sp/np.pi)
+        Leff = L + delta_L
+        Map = self.rho0 * Leff / Sp
+    
+        # Frecuencia de resonancia real del puerto
+        fb = 1 / (2 * np.pi * np.sqrt(Map * Cab))
+    
         w = 2 * np.pi * f
-        fb = 50  # Frecuencia de sintonía del puerto (aproximada)
-        
-        # Fase del puerto: adelantada respecto al cono
         phase_rad = np.arctan2(w / (2 * np.pi * fb), 1) - np.pi/2
-        
-        # Convertir SPL de dB a presión compleja
+    
         p_ref = 20e-6
         p_mag = p_ref * 10**(spl_port_mag / 20)
         p_complex = p_mag * np.exp(1j * phase_rad)
-        
+    
         return p_complex[0] if f_was_scalar else p_complex
 
     def spl_phase(self, f, U=2.83):
